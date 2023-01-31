@@ -1,0 +1,199 @@
+@use "../node_modules/hsluv-sass/src/_hsluv.scss" as hsluv
+	
+@font-face
+	font-family: Quicksand
+	font-weight: light
+	src: url("assets/fonts/Quicksand-Light.ttf")
+
+$font_family_page: Quicksand
+
+$color_grey_1: hsluv.hsluv(270, 30, 1)
+$color_grey_3: hsluv.hsluv(270, 15, 3)
+$color_grey_95: hsluv.hsluv(270, 0, 95)
+$color_aqua_50: hsluv.hsluv(180, 100, 50)
+$color_aqua_70: hsluv.hsluv(180, 100, 70)
+$color_blue_50: hsluv.hsluv(270, 100, 50)
+$color_orange_50: hsluv.hsluv(30, 100, 50)
+$color_red_50: hsluv.hsluv(0, 100, 50)
+$color_green_50: hsluv.hsluv(120, 100, 50)
+
+$color_main_one_dark: $color_grey_1
+$color_main_one_medium: $color_grey_3
+
+$color_accent_one_light: $color_aqua_70
+$color_accent_one_medium: $color_aqua_50
+$color_accent_two_medium: $color_red_50
+$color_accent_four_medium: $color_orange_50
+$color_accent_five_medium: $color_green_50
+
+$color_bg_0: hsluv.hsluv(270, 10, 6/6*10+2)
+$color_bg_1: hsluv.hsluv(270, 10, 5/6*10+2)
+$color_bg_2: hsluv.hsluv(270, 10, 4/6*10+2)
+$color_bg_3: hsluv.hsluv(270, 10, 3/6*10+2)
+$color_bg_4: hsluv.hsluv(270, 10, 2/6*10+2)
+$color_bg_5: hsluv.hsluv(270, 10, 1/6*10+2)
+$color_bg_6: hsluv.hsluv(270, 10, 0/6*10+2)
+
+$color_font_dark: $color_grey_3
+$color_font_light: $color_grey_95
+$color_font_header: $color_aqua_70
+$color_shadow_blue: $color_blue_50
+
+$size_font_xxl: 2rem
+$size_font_xl: 1.5rem
+$size_font_l: 1.2rem
+$size_font_m: 1rem
+
+$size_gap_l: 2rem
+$size_gap_m: 1rem
+$size_gap_s: 0.5rem
+$size_gap_xs: 0.2rem
+
+body
+	// background: $color_bg_0
+	background-image: linear-gradient(135deg, $color_bg_0 0%, $color_bg_0 1/6*100%, $color_bg_1 1/6*100%, $color_bg_1 2/6*100%, $color_bg_2 2/6*100%, $color_bg_2 3/6*100%, $color_bg_3 3/6*100%, $color_bg_3 4/6*100%, $color_bg_4 4/6*100%, $color_bg_4 5/6*100%, $color_bg_5 5/6*100%, $color_bg_5 6/6*100%)
+	color: $color_font_light
+	display: grid
+	font-family: $font_family_page
+	font-size: $size_font_m
+	grid-template-columns: 16fr 68fr 16fr
+	grid-template-rows: auto auto auto auto auto
+	margin: $size_gap_l 0
+	grid-gap: $size_gap_l
+
+header
+	background-color: $color_main_one_dark
+	box-shadow: $size_gap_s $size_gap_s $color_shadow_blue
+	grid-column: 2
+	grid-row: 1
+	padding: $size_gap_l
+
+footer
+	background-color: $color_main_one_dark
+	box-shadow: $size_gap_s $size_gap_s $color_accent_four_medium
+	grid-column: 2
+	grid-row: 5
+	padding: $size_gap_l
+
+article
+	background-color: $color_main_one_dark
+	flex: 1
+	min-width: 40%
+	padding: $size_gap_m
+
+h1
+	color: $color_accent_one_light
+	font-family: inherit
+	font-size: $size_font_xxl
+	font-weight: lighter
+	margin: 0
+
+h2
+	font-family: inherit
+	font-size: $size_font_xl
+	font-weight: lighter
+	margin: 0
+
+h3
+	color: $color_accent_one_light
+	font-family: inherit
+	font-size: $size_font_xl
+	font-weight: normal
+	margin: 0 0 $size_gap_m 0
+
+h4
+	font-family: inherit
+	font-size: $size_font_l
+	margin: 0
+	color: $color_accent_one_light
+
+a
+	color: inherit
+	font-size: $size_font_l
+	text-decoration: none
+
+a:hover
+	color: $color_accent_one_light
+
+li:not(:first-of-type)
+	padding: $size_gap_xs 0 0 0
+
+#game-canvas
+	aspect-ratio: 16 / 9
+	box-shadow: $size_gap_s $size_gap_s $color_accent_one_medium
+	grid-column: 2
+	grid-row: 2
+	width: 100%
+
+#controls
+	background-color: $color_main_one_dark
+	box-shadow: $size_gap_s $size_gap_s $color_accent_two_medium
+	grid-column: 2
+	grid-row: 3
+	padding: $size_gap_l
+	font-weight: bold
+
+#controls > div
+	display: flex
+	gap: $size_gap_s
+	align-items: center
+
+#controls > div > *:nth-child(n+2)
+	margin-left: $size_gap_s
+
+#articles
+	background-color: $color_main_one_dark
+	box-shadow: $size_gap_s $size_gap_s $color_accent_five_medium
+	display: flex
+	gap: $size_gap_m $size_gap_m
+	grid-column: 2
+	grid-row: 4
+	padding: $size_gap_m
+	flex-wrap: wrap
+
+#github-link
+	align-items: center
+	display: flex
+	width: fit-content
+
+#github-link > svg
+	height: $size_gap_l
+	margin-right: $size_gap_s
+
+#github-link:hover > svg > path
+	fill: $color_accent_one_medium
+
+#background
+	bottom: 0
+	height: 100%
+	left: 0
+	position: fixed
+	right: 0
+	top: 0
+	width: 100%
+	z-index: -1
+
+#background > rect:nth-child(1)
+	fill: $color_bg_1
+
+#background > rect:nth-child(2)
+	fill: $color_bg_2
+
+#background > rect:nth-child(3)
+	fill: $color_bg_3
+
+#background > rect:nth-child(4)
+	fill: $color_bg_4
+
+#background > rect:nth-child(5)
+	fill: $color_bg_5
+
+#background > rect:nth-child(6)
+	fill: $color_bg_6
+
+.key
+	background-color: $color_main_one_medium
+	padding: $size_gap_s
+	display: flex
+	align-items: center
+	justify-content: center

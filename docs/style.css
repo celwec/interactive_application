@@ -1,0 +1,181 @@
+@font-face {
+  font-family: Quicksand;
+  font-weight: light;
+  src: url("assets/fonts/Quicksand-Light.ttf");
+}
+body {
+  background-image: linear-gradient(135deg, rgb(32, 31, 39) 0%, rgb(32, 31, 39) 16.6666666667%, rgb(28, 27, 35) 16.6666666667%, rgb(28, 27, 35) 33.3333333333%, rgb(25, 24, 31) 33.3333333333%, rgb(25, 24, 31) 50%, rgb(22, 21, 27) 50%, rgb(22, 21, 27) 66.6666666667%, rgb(18, 17, 23) 66.6666666667%, rgb(18, 17, 23) 83.3333333333%, rgb(13, 13, 17) 83.3333333333%, rgb(13, 13, 17) 100%);
+  color: rgb(241, 241, 241);
+  display: grid;
+  font-family: Quicksand;
+  font-size: 1rem;
+  grid-template-columns: 16fr 68fr 16fr;
+  grid-template-rows: auto auto auto auto auto;
+  margin: 2rem 0;
+  grid-gap: 2rem;
+}
+
+header {
+  background-color: rgb(4, 3, 9);
+  box-shadow: 0.5rem 0.5rem rgb(121, 89, 255);
+  grid-column: 2;
+  grid-row: 1;
+  padding: 2rem;
+}
+
+footer {
+  background-color: rgb(4, 3, 9);
+  box-shadow: 0.5rem 0.5rem rgb(188, 92, 0);
+  grid-column: 2;
+  grid-row: 5;
+  padding: 2rem;
+}
+
+article {
+  background-color: rgb(4, 3, 9);
+  flex: 1;
+  min-width: 40%;
+  padding: 1rem;
+}
+
+h1 {
+  color: rgb(0, 192, 178);
+  font-family: inherit;
+  font-size: 2rem;
+  font-weight: lighter;
+  margin: 0;
+}
+
+h2 {
+  font-family: inherit;
+  font-size: 1.5rem;
+  font-weight: lighter;
+  margin: 0;
+}
+
+h3 {
+  color: rgb(0, 192, 178);
+  font-family: inherit;
+  font-size: 1.5rem;
+  font-weight: normal;
+  margin: 0 0 1rem 0;
+}
+
+h4 {
+  font-family: inherit;
+  font-size: 1.2rem;
+  margin: 0;
+  color: rgb(0, 192, 178);
+}
+
+a {
+  color: inherit;
+  font-size: 1.2rem;
+  text-decoration: none;
+}
+
+a:hover {
+  color: rgb(0, 192, 178);
+}
+
+li:not(:first-of-type) {
+  padding: 0.2rem 0 0 0;
+}
+
+#game-canvas {
+  aspect-ratio: 16/9;
+  box-shadow: 0.5rem 0.5rem rgb(0, 134, 124);
+  grid-column: 2;
+  grid-row: 2;
+  width: 100%;
+}
+
+#controls {
+  background-color: rgb(4, 3, 9);
+  box-shadow: 0.5rem 0.5rem rgb(234, 0, 100);
+  grid-column: 2;
+  grid-row: 3;
+  padding: 2rem;
+  font-weight: bold;
+}
+
+#controls > div {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+#controls > div > *:nth-child(n+2) {
+  margin-left: 0.5rem;
+}
+
+#articles {
+  background-color: rgb(4, 3, 9);
+  box-shadow: 0.5rem 0.5rem rgb(63, 135, 0);
+  display: flex;
+  gap: 1rem 1rem;
+  grid-column: 2;
+  grid-row: 4;
+  padding: 1rem;
+  flex-wrap: wrap;
+}
+
+#github-link {
+  align-items: center;
+  display: flex;
+  width: fit-content;
+}
+
+#github-link > svg {
+  height: 2rem;
+  margin-right: 0.5rem;
+}
+
+#github-link:hover > svg > path {
+  fill: rgb(0, 134, 124);
+}
+
+#background {
+  bottom: 0;
+  height: 100%;
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 100%;
+  z-index: -1;
+}
+
+#background > rect:nth-child(1) {
+  fill: rgb(28, 27, 35);
+}
+
+#background > rect:nth-child(2) {
+  fill: rgb(25, 24, 31);
+}
+
+#background > rect:nth-child(3) {
+  fill: rgb(22, 21, 27);
+}
+
+#background > rect:nth-child(4) {
+  fill: rgb(18, 17, 23);
+}
+
+#background > rect:nth-child(5) {
+  fill: rgb(13, 13, 17);
+}
+
+#background > rect:nth-child(6) {
+  fill: rgb(7, 7, 10);
+}
+
+.key {
+  background-color: rgb(11, 10, 17);
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/*# sourceMappingURL=style.css.map */
