@@ -162,8 +162,6 @@ class Matrix {
     }
 }
 class Vector {
-    x;
-    y;
     constructor(x, y) {
         this.x = x || 0;
         this.y = y || 0;
@@ -245,13 +243,10 @@ class Vector {
     }
 }
 class Force {
-    linear;
-    rotational;
-    scalar;
     constructor(settings) {
-        this.linear = settings?.linear || new Vector();
-        this.rotational = settings?.rotational || new Vector();
-        this.scalar = settings?.scalar || new Vector(1, 1);
+        this.linear = (settings === null || settings === void 0 ? void 0 : settings.linear) || new Vector();
+        this.rotational = (settings === null || settings === void 0 ? void 0 : settings.rotational) || new Vector();
+        this.scalar = (settings === null || settings === void 0 ? void 0 : settings.scalar) || new Vector(1, 1);
     }
 }
 function lerp(a, b, t) {
@@ -261,8 +256,6 @@ function clamp(val, min, max) {
     return Math.min(Math.max(val, min), max);
 }
 class Point {
-    x;
-    y;
     constructor(x, y) {
         this.x = x || 0;
         this.y = y || 0;
@@ -304,8 +297,6 @@ class Point {
     }
 }
 class Segment {
-    start;
-    end;
     constructor(x0, y0, x1, y1) {
         this.start = new Point(x0, y0);
         this.end = new Point(x1, y1);
@@ -321,7 +312,6 @@ class Segment {
     }
 }
 class Rectangle {
-    size;
     constructor(w, h) {
         this.size = new Vector();
         this.size.x = w || 1;
@@ -341,17 +331,12 @@ class Rectangle {
     }
 }
 class Ellipse {
-    size;
     constructor(rx, ry) {
         this.size.x = rx || 1;
         this.size.y = ry || 1;
     }
 }
 class Polygon {
-    vertices;
-    points;
-    edges;
-    normals;
     constructor(points) {
         this.points = points || [];
         this.vertices = [];
@@ -481,16 +466,6 @@ const colorStarFill = [0 / 255, 192 / 255, 178 / 255, 1];
 const colorBuildingFill = [17 / 255, 14 / 255, 35 / 255, 1];
 const colorWindowFill = [149 / 255, 114 / 255, 0 / 255, 1];
 class Player {
-    runSpeed;
-    walkSpeed;
-    isJumping;
-    jumpStartTime;
-    jumpDurationMs;
-    jumpSpeed;
-    jumpStartY;
-    jumpEndY;
-    jumpHeight;
-    isCasting;
     constructor() {
         this.walkSpeed = 1;
         this.runSpeed = 2;
@@ -511,16 +486,10 @@ class Player {
     }
 }
 class Transform {
-    position;
-    rotation;
-    scale;
-    lastPosition;
-    lastRotation;
-    lastScale;
     constructor(settings) {
-        this.position = settings?.position || new Vector();
-        this.rotation = settings?.rotation || new Vector();
-        this.scale = settings?.scale || new Vector(1, 1);
+        this.position = (settings === null || settings === void 0 ? void 0 : settings.position) || new Vector();
+        this.rotation = (settings === null || settings === void 0 ? void 0 : settings.rotation) || new Vector();
+        this.scale = (settings === null || settings === void 0 ? void 0 : settings.scale) || new Vector(1, 1);
         this.lastPosition = this.position;
         this.lastRotation = this.rotation;
         this.lastScale = this.scale;
@@ -548,35 +517,23 @@ class Transform {
     }
 }
 class Solid {
-    collider;
-    friction;
-    gravity;
-    velocity;
-    isCollisionEnabled;
-    isGravityEnabled;
-    isStatic;
     constructor(settings) {
-        this.collider = settings?.collider || new Polygon();
-        this.friction = settings?.friction || new Force();
-        this.gravity = settings?.gravity || new Force();
-        this.velocity = settings?.velocity || new Force();
-        this.isCollisionEnabled = settings?.isCollisionEnabled || false;
-        this.isGravityEnabled = settings?.isGravityEnabled || false;
-        this.isStatic = settings?.isStatic || false;
+        this.collider = (settings === null || settings === void 0 ? void 0 : settings.collider) || new Polygon();
+        this.friction = (settings === null || settings === void 0 ? void 0 : settings.friction) || new Force();
+        this.gravity = (settings === null || settings === void 0 ? void 0 : settings.gravity) || new Force();
+        this.velocity = (settings === null || settings === void 0 ? void 0 : settings.velocity) || new Force();
+        this.isCollisionEnabled = (settings === null || settings === void 0 ? void 0 : settings.isCollisionEnabled) || false;
+        this.isGravityEnabled = (settings === null || settings === void 0 ? void 0 : settings.isGravityEnabled) || false;
+        this.isStatic = (settings === null || settings === void 0 ? void 0 : settings.isStatic) || false;
     }
 }
 class Colorable {
-    layer;
-    shape;
-    backgroundColor;
-    borderColor;
-    borderWidth;
     constructor(settings) {
-        this.layer = settings?.layer || 0;
-        this.shape = settings?.shape || new Polygon();
-        this.backgroundColor = settings?.backgroundColor;
-        this.borderColor = settings?.borderColor;
-        this.borderWidth = settings?.borderWidth || 0;
+        this.layer = (settings === null || settings === void 0 ? void 0 : settings.layer) || 0;
+        this.shape = (settings === null || settings === void 0 ? void 0 : settings.shape) || new Polygon();
+        this.backgroundColor = settings === null || settings === void 0 ? void 0 : settings.backgroundColor;
+        this.borderColor = settings === null || settings === void 0 ? void 0 : settings.borderColor;
+        this.borderWidth = (settings === null || settings === void 0 ? void 0 : settings.borderWidth) || 0;
     }
 }
 class Movement {
@@ -716,25 +673,6 @@ class Physics {
     }
 }
 class App {
-    _entities;
-    _systems;
-    _keyStates;
-    _currentTime;
-    _lastTime;
-    _elapsedTime;
-    _updateBehindTime;
-    _renderBehindTime;
-    _msPerUpdate;
-    _msPerRender;
-    _canvas;
-    _canvasWidth;
-    _canvasHeight;
-    _gl;
-    _program;
-    _positionAttributeLocation;
-    _matrixUniformLocation;
-    _colorUniformLocation;
-    _positionBuffer;
     constructor(entities, systems) {
         this._entities = entities;
         this._systems = systems;
