@@ -43,12 +43,18 @@ class Physics implements System {
 	}
 
 	private processGravity(solid: Solid): void {
-		if (solid.isGravityEnabled) {
-			solid.velocity.linear = solid.velocity.linear.add(solid.gravity.linear);
+		if (!solid.isGravityEnabled) {
+			return;
 		}
+		
+		solid.velocity.linear = solid.velocity.linear.add(solid.gravity.linear);
 	}
 	
 	private processFriction(solid: Solid): void {
+		if (!solid.isFrictionEnabled) {
+			return;
+		}
+
 		solid.velocity.linear = solid.velocity.linear.multiply(Vector.one.subtract(solid.friction.linear));
 		solid.velocity.rotational = solid.velocity.rotational.multiply(solid.friction.rotational);
 		solid.velocity.scalar = solid.velocity.scalar.multiply(solid.friction.scalar);

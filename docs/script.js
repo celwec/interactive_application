@@ -162,6 +162,8 @@ class Matrix {
     }
 }
 class Vector {
+    x;
+    y;
     constructor(x, y) {
         this.x = x || 0;
         this.y = y || 0;
@@ -243,10 +245,13 @@ class Vector {
     }
 }
 class Force {
+    linear;
+    rotational;
+    scalar;
     constructor(settings) {
-        this.linear = (settings === null || settings === void 0 ? void 0 : settings.linear) || new Vector();
-        this.rotational = (settings === null || settings === void 0 ? void 0 : settings.rotational) || new Vector();
-        this.scalar = (settings === null || settings === void 0 ? void 0 : settings.scalar) || new Vector(1, 1);
+        this.linear = settings?.linear || new Vector();
+        this.rotational = settings?.rotational || new Vector();
+        this.scalar = settings?.scalar || new Vector(1, 1);
     }
 }
 function lerp(a, b, t) {
@@ -255,7 +260,44 @@ function lerp(a, b, t) {
 function clamp(val, min, max) {
     return Math.min(Math.max(val, min), max);
 }
+function initWebGL2(context) {
+    const vertexShader = createShader(context, context.VERTEX_SHADER, vertexShaderCode);
+    const fragmentShader = createShader(context, context.FRAGMENT_SHADER, fragmentShaderCode);
+    if (!vertexShader || !fragmentShader) {
+        console.error("Could not create shaders");
+        return;
+    }
+    this._program = createProgram(context, vertexShader, fragmentShader);
+    if (!this._program) {
+        console.error("Could not create program");
+        return;
+    }
+    this._positionAttributeLocation = context.getAttribLocation(this._program, "a_position");
+    this._texcoordAttributeLocation = context.getAttribLocation(this._program, "a_texcoord");
+    this._matrixUniformLocation = context.getUniformLocation(this._program, "u_matrix");
+    this._colorUniformLocation = context.getUniformLocation(this._program, "u_color");
+    if (!this._matrixUniformLocation || !this._colorUniformLocation) {
+        console.error("Could not get uniform location");
+        return;
+    }
+    this._positionBuffer = context.createBuffer();
+    if (!this._positionBuffer) {
+        console.error("Could not create position buffer");
+        return;
+    }
+    context.bindBuffer(context.ARRAY_BUFFER, this._positionBuffer);
+    context.viewport(0, 0, this._canvasWidth, this._canvasHeight);
+    context.clearColor(28 / 255, 22 / 255, 58 / 255, 1);
+    const texture = context.createTexture();
+    context.bindTexture(context.TEXTURE_2D, texture);
+    context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, 1, 1, 0, context.RGBA, context.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+    context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MIN_FILTER, context.LINEAR);
+    context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_S, context.CLAMP_TO_EDGE);
+    context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_T, context.CLAMP_TO_EDGE);
+}
 class Point {
+    x;
+    y;
     constructor(x, y) {
         this.x = x || 0;
         this.y = y || 0;
@@ -297,6 +339,8 @@ class Point {
     }
 }
 class Segment {
+    start;
+    end;
     constructor(x0, y0, x1, y1) {
         this.start = new Point(x0, y0);
         this.end = new Point(x1, y1);
@@ -312,6 +356,7 @@ class Segment {
     }
 }
 class Rectangle {
+    size;
     constructor(w, h) {
         this.size = new Vector();
         this.size.x = w || 1;
@@ -331,12 +376,17 @@ class Rectangle {
     }
 }
 class Ellipse {
+    size;
     constructor(rx, ry) {
         this.size.x = rx || 1;
         this.size.y = ry || 1;
     }
 }
 class Polygon {
+    vertices;
+    points;
+    edges;
+    normals;
     constructor(points) {
         this.points = points || [];
         this.vertices = [];
@@ -412,19 +462,28 @@ class Polygon {
 }
 const vertexShaderCode = `
 	attribute vec2 a_position;
+	attribute vec2 a_texcoord;
+
 	uniform mat3 u_matrix;
+
+	varying vec2 v_texcoord;
 
 	void main() {
 		gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
+		v_texcoord = a_texcoord;
 	}
 `;
 const fragmentShaderCode = `
 	precision mediump float;
 
 	uniform vec4 u_color;
+	uniform sampler2D u_texture;
+
+	varying vec2 v_texcoord;
 
 	void main() {
-		gl_FragColor = u_color;
+		gl_FragColor = u_color * texture2D(u_texture, v_texcoord);
+		// gl_FragColor = u_color;
 	}
 `;
 function createShader(gl, type, source) {
@@ -464,8 +523,18 @@ const colorGroundFill = [4 / 255, 3 / 255, 8 / 255, 1];
 const colorCloudFill = [234 / 255, 0 / 255, 100 / 255, 1];
 const colorStarFill = [0 / 255, 192 / 255, 178 / 255, 1];
 const colorBuildingFill = [17 / 255, 14 / 255, 35 / 255, 1];
-const colorWindowFill = [149 / 255, 114 / 255, 0 / 255, 1];
+const colorWindowFill = [240 / 255, 240 / 255, 240 / 255, 1];
 class Player {
+    runSpeed;
+    walkSpeed;
+    isJumping;
+    jumpStartTime;
+    jumpDurationMs;
+    jumpSpeed;
+    jumpStartY;
+    jumpEndY;
+    jumpHeight;
+    isCasting;
     constructor() {
         this.walkSpeed = 1;
         this.runSpeed = 2;
@@ -486,10 +555,16 @@ class Player {
     }
 }
 class Transform {
+    position;
+    rotation;
+    scale;
+    lastPosition;
+    lastRotation;
+    lastScale;
     constructor(settings) {
-        this.position = (settings === null || settings === void 0 ? void 0 : settings.position) || new Vector();
-        this.rotation = (settings === null || settings === void 0 ? void 0 : settings.rotation) || new Vector();
-        this.scale = (settings === null || settings === void 0 ? void 0 : settings.scale) || new Vector(1, 1);
+        this.position = settings?.position || new Vector();
+        this.rotation = settings?.rotation || new Vector();
+        this.scale = settings?.scale || new Vector(1, 1);
         this.lastPosition = this.position;
         this.lastRotation = this.rotation;
         this.lastScale = this.scale;
@@ -517,23 +592,108 @@ class Transform {
     }
 }
 class Solid {
+    collider;
+    friction;
+    gravity;
+    velocity;
+    isCollisionEnabled;
+    isFrictionEnabled;
+    isGravityEnabled;
+    isVelocityEnabled;
+    isStatic;
     constructor(settings) {
-        this.collider = (settings === null || settings === void 0 ? void 0 : settings.collider) || new Polygon();
-        this.friction = (settings === null || settings === void 0 ? void 0 : settings.friction) || new Force();
-        this.gravity = (settings === null || settings === void 0 ? void 0 : settings.gravity) || new Force();
-        this.velocity = (settings === null || settings === void 0 ? void 0 : settings.velocity) || new Force();
-        this.isCollisionEnabled = (settings === null || settings === void 0 ? void 0 : settings.isCollisionEnabled) || false;
-        this.isGravityEnabled = (settings === null || settings === void 0 ? void 0 : settings.isGravityEnabled) || false;
-        this.isStatic = (settings === null || settings === void 0 ? void 0 : settings.isStatic) || false;
+        this.collider = settings?.collider || new Polygon();
+        this.isStatic = settings?.isStatic || false;
+        this.isCollisionEnabled = settings?.isCollisionEnabled || false;
+        this.friction = settings?.friction || new Force();
+        this.gravity = settings?.gravity || new Force();
+        this.velocity = settings?.velocity || new Force();
+        this.isFrictionEnabled = settings?.isFrictionEnabled || false;
+        this.isGravityEnabled = settings?.isGravityEnabled || false;
+        this.isVelocityEnabled = settings?.isVelocityEnabled || false;
     }
 }
-class Colorable {
+class Renderable {
+    backgroundColor;
+    borderColor;
+    borderWidth;
+    layer;
+    shape;
     constructor(settings) {
-        this.layer = (settings === null || settings === void 0 ? void 0 : settings.layer) || 0;
-        this.shape = (settings === null || settings === void 0 ? void 0 : settings.shape) || new Polygon();
-        this.backgroundColor = settings === null || settings === void 0 ? void 0 : settings.backgroundColor;
-        this.borderColor = settings === null || settings === void 0 ? void 0 : settings.borderColor;
-        this.borderWidth = (settings === null || settings === void 0 ? void 0 : settings.borderWidth) || 0;
+        this.backgroundColor = settings?.backgroundColor;
+        this.borderColor = settings?.borderColor;
+        this.borderWidth = settings?.borderWidth || 0;
+        this.layer = settings?.layer || 0;
+        this.shape = settings?.shape || new Polygon();
+    }
+}
+class Message {
+    alignment;
+    animated;
+    backgroundColor;
+    borderColor;
+    borderWidth;
+    content;
+    currentIndex;
+    fontFamily;
+    fontSize;
+    fontColor;
+    layer;
+    padding;
+    shape;
+    texture;
+    width;
+    height;
+    constructor(settings) {
+        this.alignment = settings?.alignment || "left";
+        this.animated = settings?.animated || false;
+        this.backgroundColor = settings?.backgroundColor;
+        this.borderColor = settings?.borderColor;
+        this.borderWidth = settings?.borderWidth || 0;
+        this.content = settings?.content || "";
+        this.currentIndex = settings?.currentIndex || 0;
+        this.fontFamily = settings?.fontFamily || "monospace";
+        this.fontSize = settings?.fontSize || 16;
+        this.layer = settings?.layer || 50;
+        this.padding = settings?.padding || 0;
+        this.shape = settings?.shape || new Polygon();
+        this.fontColor = settings?.fontColor || "#000000";
+        const lines = this.content.split("\n");
+        const fontWidth = this.fontSize * 3 / 5;
+        const w = fontWidth * this.content.split("\n").reduce((maxLength, line) => Math.max(maxLength, line.length), 0) + this.padding * 2 + this.borderWidth * 2;
+        const h = this.fontSize * this.content.split("\n").length + this.padding * 2 + this.borderWidth * 2;
+        this.width = w;
+        this.height = h;
+        const buffer = new OffscreenCanvas(w, h);
+        const context = buffer.getContext("2d");
+        context.textBaseline = "top";
+        context.textAlign = this.alignment;
+        context.fillStyle = this.borderColor ? this.borderColor : "#000000";
+        context.fillRect(0, 0, w, h);
+        context.fillStyle = this.backgroundColor ? this.backgroundColor : "#000000";
+        context.fillRect(this.borderWidth, this.borderWidth, w - this.borderWidth * 2, h - this.borderWidth * 2);
+        context.font = `${this.fontSize}px ${this.fontFamily}`;
+        context.fillStyle = this.fontColor;
+        const offset = this.alignment === "left" ? this.padding + this.borderWidth : this.alignment === "center" ? w / 2 : w - this.padding - this.borderWidth;
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            context.fillText(line, offset, i * this.fontSize + this.padding + this.borderWidth);
+        }
+        createImageBitmap(buffer).then(imageBitmap => {
+            this.texture = imageBitmap;
+        });
+    }
+}
+class Scrollable {
+    minX;
+    minY;
+    maxX;
+    maxY;
+    constructor(minX, maxX, minY, maxY) {
+        this.minX = minX;
+        this.maxX = maxX;
+        this.minY = minY;
+        this.maxY = maxY;
     }
 }
 class Movement {
@@ -541,8 +701,11 @@ class Movement {
         const filtered = entities.all([Transform, Solid]);
         for (let i = 0; i < filtered.length; i++) {
             const entity = filtered[i];
-            const transform = entity.get(Transform.name);
             const solid = entity.get(Solid.name);
+            if (!solid.isVelocityEnabled) {
+                continue;
+            }
+            const transform = entity.get(Transform.name);
             if (!transform || !solid) {
                 return;
             }
@@ -584,11 +747,15 @@ class Physics {
         }
     }
     processGravity(solid) {
-        if (solid.isGravityEnabled) {
-            solid.velocity.linear = solid.velocity.linear.add(solid.gravity.linear);
+        if (!solid.isGravityEnabled) {
+            return;
         }
+        solid.velocity.linear = solid.velocity.linear.add(solid.gravity.linear);
     }
     processFriction(solid) {
+        if (!solid.isFrictionEnabled) {
+            return;
+        }
         solid.velocity.linear = solid.velocity.linear.multiply(Vector.one.subtract(solid.friction.linear));
         solid.velocity.rotational = solid.velocity.rotational.multiply(solid.friction.rotational);
         solid.velocity.scalar = solid.velocity.scalar.multiply(solid.friction.scalar);
@@ -672,10 +839,51 @@ class Physics {
         return false;
     }
 }
+class Scrolling {
+    update(entities) {
+        for (let i = 0; i < entities.length; i++) {
+            const entity = entities[i];
+            const transform = entity.get(Transform.name);
+            const scrollable = entity.get(Scrollable.name);
+            if (transform.position.x < scrollable.minX) {
+                transform.position.x = scrollable.maxX;
+            }
+            else if (transform.position.x > scrollable.maxX) {
+                transform.position.x = scrollable.minX;
+            }
+            if (transform.position.y < scrollable.minY) {
+                transform.position.y = scrollable.maxY;
+            }
+            else if (transform.position.y > scrollable.maxY) {
+                transform.position.y = scrollable.minY;
+            }
+        }
+    }
+}
 class App {
-    constructor(entities, systems) {
-        this._entities = entities;
-        this._systems = systems;
+    _entities;
+    _systems;
+    _keyStates;
+    _currentTime;
+    _lastTime;
+    _elapsedTime;
+    _updateBehindTime;
+    _renderBehindTime;
+    _msPerUpdate;
+    _msPerRender;
+    _canvas;
+    _canvasWidth;
+    _canvasHeight;
+    _gl;
+    _program;
+    _positionAttributeLocation;
+    _texcoordAttributeLocation;
+    _matrixUniformLocation;
+    _colorUniformLocation;
+    _positionBuffer;
+    constructor(settings) {
+        this._entities = settings.entities;
+        this._systems = settings.systems;
         this._keyStates = Object;
         this._currentTime = 0;
         this._lastTime = 0;
@@ -684,6 +892,8 @@ class App {
         this._renderBehindTime = 0;
         this._msPerUpdate = 1000 / 60;
         this._msPerRender = 1000 / 240;
+        this._canvasWidth = settings.width || 1280;
+        this._canvasHeight = settings.height || 720;
         this._loop = this._loop.bind(this);
         this._processInput = this._processInput.bind(this);
         this._keyboardEventHandler = this._keyboardEventHandler.bind(this);
@@ -694,10 +904,8 @@ class App {
             console.error("Canvas not found");
             return;
         }
-        this._canvasWidth = this._canvas.clientWidth;
-        this._canvasHeight = this._canvas.clientHeight;
-        this._canvas.width = this._canvas.clientWidth;
-        this._canvas.height = this._canvas.clientHeight;
+        this._canvas.width = this._canvasWidth;
+        this._canvas.height = this._canvasHeight;
         this._gl = this._canvas.getContext("webgl2");
         if (!this._gl) {
             console.error("This browser does not support webgl2");
@@ -715,6 +923,7 @@ class App {
             return;
         }
         this._positionAttributeLocation = this._gl.getAttribLocation(this._program, "a_position");
+        this._texcoordAttributeLocation = this._gl.getAttribLocation(this._program, "a_texcoord");
         this._matrixUniformLocation = this._gl.getUniformLocation(this._program, "u_matrix");
         this._colorUniformLocation = this._gl.getUniformLocation(this._program, "u_color");
         if (!this._matrixUniformLocation || !this._colorUniformLocation) {
@@ -729,6 +938,12 @@ class App {
         this._gl.bindBuffer(this._gl.ARRAY_BUFFER, this._positionBuffer);
         this._gl.viewport(0, 0, this._canvasWidth, this._canvasHeight);
         this._gl.clearColor(28 / 255, 22 / 255, 58 / 255, 1);
+        const texture = this._gl.createTexture();
+        this._gl.bindTexture(this._gl.TEXTURE_2D, texture);
+        this._gl.texImage2D(this._gl.TEXTURE_2D, 0, this._gl.RGBA, 1, 1, 0, this._gl.RGBA, this._gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+        this._gl.texParameteri(this._gl.TEXTURE_2D, this._gl.TEXTURE_MIN_FILTER, this._gl.LINEAR);
+        this._gl.texParameteri(this._gl.TEXTURE_2D, this._gl.TEXTURE_WRAP_S, this._gl.CLAMP_TO_EDGE);
+        this._gl.texParameteri(this._gl.TEXTURE_2D, this._gl.TEXTURE_WRAP_T, this._gl.CLAMP_TO_EDGE);
         requestAnimationFrame(this._loop);
     }
     _loop() {
@@ -761,55 +976,31 @@ class App {
             return;
         }
         const speed = this._keyStates["shift"] ? player.runSpeed : player.walkSpeed;
-        if (this._keyStates["a_down"] || this._keyStates["arrowleft_down"]) {
+        if (this._keyStates["a"] || this._keyStates["arrowleft"]) {
             solid.velocity.linear.x -= speed;
         }
-        if (this._keyStates["d_down"] || this._keyStates["arrowright_down"]) {
+        if (this._keyStates["d"] || this._keyStates["arrowright"]) {
             solid.velocity.linear.x += speed;
         }
-        if (!player.isCasting && (this._keyStates["e_down"] || this._keyStates["enter_down"])) {
+        if (!player.isCasting && (this._keyStates["e"] || this._keyStates["enter"])) {
             player.isCasting = true;
         }
-        if (!this._keyStates["e_down"] && !this._keyStates["enter_down"]) {
+        if (!this._keyStates["e"] && !this._keyStates["enter"]) {
             player.isCasting = false;
         }
-        if (this._keyStates[" _down"] && !player.isJumping && transform.lastPosition.y === transform.position.y) {
+        if (this._keyStates[" "] && !player.isJumping && transform.lastPosition.y === transform.position.y) {
             player.jumpStartTime = performance.now();
             player.isJumping = true;
             player.jumpStartY = transform.position.y;
             player.jumpEndY = transform.position.y - player.jumpHeight;
         }
-        if (!this._keyStates[" _down"]) {
+        if (!this._keyStates[" "]) {
             player.isJumping = false;
         }
-        if (this._keyStates[" _down"] && player.isJumping && !player.jumpFinished) {
+        if (this._keyStates[" "] && player.isJumping && !player.jumpFinished) {
             if (transform.position.y > player.jumpEndY) {
                 solid.velocity.linear.y = -player.jumpSpeed;
             }
-        }
-        if (this._keyStates["q_down"]) {
-            solid.velocity.rotational.radians -= speed;
-        }
-        if (this._keyStates["e_down"]) {
-            solid.velocity.rotational.radians += speed;
-        }
-        if (this._keyStates["r_down"]) {
-            solid.velocity.scalar.x -= speed;
-        }
-        if (this._keyStates["t_down"]) {
-            solid.velocity.scalar.x += speed;
-        }
-        if (this._keyStates["f_down"]) {
-            solid.velocity.scalar.y -= speed;
-        }
-        if (this._keyStates["g_down"]) {
-            solid.velocity.scalar.y += speed;
-        }
-        if (this._keyStates["w_down"] || this._keyStates["arrowleft_down"]) {
-            solid.velocity.linear.y -= speed;
-        }
-        if (this._keyStates["s_down"] || this._keyStates["arrowright_down"]) {
-            solid.velocity.linear.y += speed;
         }
     }
     _update() {
@@ -827,9 +1018,9 @@ class App {
         if (!playerTransform) {
             return;
         }
-        const filtered = this._entities.all([Colorable, Transform, Solid]).sort((a, b) => {
-            const ac = a.get(Colorable.name);
-            const bc = b.get(Colorable.name);
+        const filtered = this._entities.all([Transform]).any([Renderable, Message]).sort((a, b) => {
+            const ac = a.get(Renderable.name) || a.get(Message.name);
+            const bc = b.get(Renderable.name) || b.get(Message.name);
             return ac.layer - bc.layer;
         });
         if (filtered.length < 1) {
@@ -838,6 +1029,7 @@ class App {
         this._gl.clear(this._gl.COLOR_BUFFER_BIT);
         this._gl.useProgram(this._program);
         this._gl.enableVertexAttribArray(this._positionAttributeLocation);
+        this._gl.enableVertexAttribArray(this._texcoordAttributeLocation);
         this._gl.bindBuffer(this._gl.ARRAY_BUFFER, this._positionBuffer);
         const size = 2;
         const type = this._gl.FLOAT;
@@ -845,34 +1037,43 @@ class App {
         const stride = 0;
         const offset = 0;
         this._gl.vertexAttribPointer(this._positionAttributeLocation, size, type, normalize, stride, offset);
+        this._gl.vertexAttribPointer(this._texcoordAttributeLocation, size, type, normalize, stride, offset);
         for (let i = 0; i < filtered.length; i++) {
             const entity = filtered[i];
             const transform = entity.get(Transform.name);
-            const solid = entity.get(Solid.name);
-            const colorable = entity.get(Colorable.name);
-            const backgroundColor = colorable.backgroundColor ? colorable.backgroundColor : [0, 0, 0, 1];
+            const renderable = entity.get(Renderable.name) || entity.get(Message.name);
+            const shape = renderable.shape;
             const dx = transform.position.x - playerTransform.position.x;
             const dy = transform.position.y - playerTransform.position.y;
             let matrix = transform.matrix;
             matrix = Matrix.project(matrix, this._canvasWidth, this._canvasHeight);
             matrix = Matrix.translate(matrix, this._canvasWidth / 2 + dx, this._canvasHeight * 68 / 100 + dy);
             matrix = Matrix.scale(matrix, transform.scale.x, transform.scale.y);
-            this._gl.bufferData(this._gl.ARRAY_BUFFER, new Float32Array(solid.collider.vertices), this._gl.STATIC_DRAW);
+            this._gl.bufferData(this._gl.ARRAY_BUFFER, new Float32Array(shape.vertices), this._gl.STATIC_DRAW);
             this._gl.uniformMatrix3fv(this._matrixUniformLocation, false, matrix);
-            this._gl.uniform4f(this._colorUniformLocation, backgroundColor[0], backgroundColor[1], backgroundColor[2], backgroundColor[3]);
+            if (renderable instanceof Renderable) {
+                if (!renderable.backgroundColor) {
+                    continue;
+                }
+                this._gl.uniform4f(this._colorUniformLocation, renderable.backgroundColor[0], renderable.backgroundColor[1], renderable.backgroundColor[2], renderable.backgroundColor[3]);
+                this._gl.texImage2D(this._gl.TEXTURE_2D, 0, this._gl.RGBA, 1, 1, 0, this._gl.RGBA, this._gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+            }
+            else {
+                this._gl.uniform4f(this._colorUniformLocation, 1, 1, 1, 1);
+                this._gl.texImage2D(this._gl.TEXTURE_2D, 0, this._gl.RGBA, renderable.width, renderable.height, 0, this._gl.RGBA, this._gl.UNSIGNED_BYTE, renderable.texture);
+            }
             const primitiveType = this._gl.TRIANGLES;
-            const count = solid.collider.vertices.length / 2;
+            const count = renderable.shape.vertices.length / 2;
             this._gl.drawArrays(primitiveType, offset, count);
         }
     }
     _keyboardEventHandler(keyboardEvent) {
         const key = keyboardEvent.key.toLowerCase();
-        if (keyboardEvent.type === "keydown" && !this._keyStates[`${key}_down`]) {
-            this._keyStates[`${key}_down`] = true;
-            this._keyStates[`${key}_time`] = performance.now();
+        if (keyboardEvent.type === "keydown" && !this._keyStates[key]) {
+            this._keyStates[key] = true;
         }
-        else if (keyboardEvent.type === "keyup" && this._keyStates[`${key}_down`]) {
-            this._keyStates[`${key}_down`] = false;
+        else if (keyboardEvent.type === "keyup" && this._keyStates[key]) {
+            this._keyStates[key] = false;
         }
         this._keyStates["shift"] = keyboardEvent.shiftKey;
         if (keyboardEvent.key === " ") {
@@ -904,8 +1105,10 @@ function createPlayer(x, y) {
         isCollisionEnabled: true,
         isGravityEnabled: true,
         isStatic: false,
+        isVelocityEnabled: true,
+        isFrictionEnabled: true,
     });
-    const colorable = new Colorable({
+    const renderable = new Renderable({
         layer: 100,
         shape: poly,
         backgroundColor: colorGroundFill,
@@ -913,7 +1116,7 @@ function createPlayer(x, y) {
     entity.set(Player.name, player);
     entity.set(Transform.name, transform);
     entity.set(Solid.name, solid);
-    entity.set(Colorable.name, colorable);
+    entity.set(Renderable.name, renderable);
     return entity;
 }
 function createGround(x, y, w, h) {
@@ -933,15 +1136,17 @@ function createGround(x, y, w, h) {
         isCollisionEnabled: true,
         isStatic: true,
         isGravityEnabled: false,
+        isFrictionEnabled: false,
+        isVelocityEnabled: false,
     });
-    const colorable = new Colorable({
+    const renderable = new Renderable({
         layer: 20,
         shape: poly,
         backgroundColor: colorGroundFill,
     });
     entity.set(Transform.name, transform);
     entity.set(Solid.name, solid);
-    entity.set(Colorable.name, colorable);
+    entity.set(Renderable.name, renderable);
     return entity;
 }
 function createCloud(minX, maxX, minY, maxY) {
@@ -1222,15 +1427,19 @@ function createCloud(minX, maxX, minY, maxY) {
         isCollisionEnabled: false,
         isGravityEnabled: false,
         isStatic: true,
+        isFrictionEnabled: false,
+        isVelocityEnabled: true,
     });
-    const colorable = new Colorable({
+    const renderable = new Renderable({
         layer: 10,
         shape: poly,
         backgroundColor: colorCloudFill,
     });
+    const scrollable = new Scrollable(minX, maxX, minY, maxY);
     entity.set(Transform.name, transform);
     entity.set(Solid.name, solid);
-    entity.set(Colorable.name, colorable);
+    entity.set(Renderable.name, renderable);
+    entity.set(Scrollable.name, scrollable);
     return entity;
 }
 function createStar(minX, maxX, minY, maxY) {
@@ -1260,15 +1469,111 @@ function createStar(minX, maxX, minY, maxY) {
         velocity: new Force({
             linear: new Vector(0.1, 0),
         }),
+        isFrictionEnabled: false,
+        isVelocityEnabled: true,
     });
-    const colorable = new Colorable({
+    const renderable = new Renderable({
         backgroundColor: colorStarFill,
         layer: 0,
         shape: poly,
     });
+    const scrollable = new Scrollable(minX, maxX, minY, maxY);
     entity.set(Transform.name, transform);
     entity.set(Solid.name, solid);
-    entity.set(Colorable.name, colorable);
+    entity.set(Renderable.name, renderable);
+    entity.set(Scrollable.name, scrollable);
+    return entity;
+}
+function createStarMap(amount, minX, maxX, minY, maxY) {
+    const entity = new Entity();
+    const transform = new Transform({
+        position: new Vector(-500, -500),
+    });
+    const solid = new Solid({
+        isCollisionEnabled: false,
+        isFrictionEnabled: false,
+        isGravityEnabled: false,
+        isVelocityEnabled: true,
+        isStatic: false,
+        velocity: new Force({
+            linear: new Vector(-0.2, 0),
+        }),
+    });
+    const buffer = new OffscreenCanvas(maxX, maxY);
+    const context = buffer.getContext("webgl2");
+    initWebGL2(context);
+    context.clear(context.COLOR_BUFFER_BIT);
+    context.useProgram(this._program);
+    context.enableVertexAttribArray(this._positionAttributeLocation);
+    context.enableVertexAttribArray(this._texcoordAttributeLocation);
+    context.bindBuffer(context.ARRAY_BUFFER, this._positionBuffer);
+    const size = 2;
+    const type = context.FLOAT;
+    const normalize = false;
+    const stride = 0;
+    const offset = 0;
+    context.vertexAttribPointer(this._positionAttributeLocation, size, type, normalize, stride, offset);
+    context.vertexAttribPointer(this._texcoordAttributeLocation, size, type, normalize, stride, offset);
+    for (let i = 0; i < amount; i++) {
+        const entity = createStar(minX, maxX, minY, maxY);
+        const transform = entity.get(Transform.name);
+        const renderable = entity.get(Renderable.name) || entity.get(Message.name);
+        const shape = renderable.shape;
+        const dx = transform.position.x;
+        const dy = transform.position.y;
+        let matrix = transform.matrix;
+        matrix = Matrix.project(matrix, this._canvasWidth, this._canvasHeight);
+        matrix = Matrix.translate(matrix, this._canvasWidth / 2 + dx, this._canvasHeight * 68 / 100 + dy);
+        matrix = Matrix.scale(matrix, transform.scale.x, transform.scale.y);
+        context.bufferData(context.ARRAY_BUFFER, new Float32Array(shape.vertices), context.STATIC_DRAW);
+        context.uniformMatrix3fv(this._matrixUniformLocation, false, matrix);
+        if (renderable instanceof Renderable) {
+            if (!renderable.backgroundColor) {
+                return;
+            }
+            context.uniform4f(this._colorUniformLocation, renderable.backgroundColor[0], renderable.backgroundColor[1], renderable.backgroundColor[2], renderable.backgroundColor[3]);
+            context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, 1, 1, 0, context.RGBA, context.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+        }
+        else {
+            context.uniform4f(this._colorUniformLocation, 1, 1, 1, 1);
+            context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, renderable.width, renderable.height, 0, context.RGBA, context.UNSIGNED_BYTE, renderable.texture);
+        }
+        const primitiveType = context.TRIANGLES;
+        const count = renderable.shape.vertices.length / 2;
+        context.drawArrays(primitiveType, offset, count);
+    }
+    return entity;
+}
+function createMessage(content, x, y, alignment) {
+    const rect = new Rectangle(1, 1);
+    const poly = new Polygon([
+        rect.topLeft,
+        rect.topRight,
+        rect.bottomLeft,
+        rect.bottomRight,
+    ]);
+    const entity = new Entity();
+    const message = new Message({
+        alignment: alignment,
+        animated: true,
+        backgroundColor: "#110d28",
+        borderColor: "#ea0064",
+        borderWidth: 4,
+        content: content,
+        fontFamily: "monospace",
+        fontSize: 20,
+        padding: 16,
+        shape: poly,
+        fontColor: "#f0f0f0",
+        layer: 60,
+    });
+    const width = message.alignment === "left" ? 0 : message.alignment === "center" ? message.width / 2 : message.width;
+    const transform = new Transform({
+        position: new Vector(x - width, y),
+        scale: new Vector(message.width, message.height),
+    });
+    entity.set(Transform.name, transform);
+    entity.set(Message.name, message);
     return entity;
 }
 const entities = new EntityArray();
@@ -1283,8 +1588,12 @@ for (let i = 0; i < 50; i++) {
     entities.push(createCloud(-2000, 9700, -500, -300));
 }
 for (let i = 0; i < 300; i++) {
-    entities.push(createStar(-2000, 9700, -700, 0));
+    entities.push(createStar(-2000, 9700, -800, 0));
 }
+entities.push(createMessage("Welcome to the interactive application!\n\nTo walk left and right\nuse the arrow keys left and right,\nor use the A and D keys.", 0, -400, "center"));
 systems.push(new Movement());
 systems.push(new Physics());
-const app = new App(entities, systems);
+const app = new App({
+    entities: entities,
+    systems: systems,
+});

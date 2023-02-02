@@ -281,17 +281,22 @@ function createCloud(minX: number, maxX: number, minY: number, maxY: number): En
 		isCollisionEnabled: false,
 		isGravityEnabled: false,
 		isStatic: true,
+		isFrictionEnabled: false,
+		isVelocityEnabled: true,
 	});
 	
-	const colorable: Colorable = new Colorable({
+	const renderable: Renderable = new Renderable({
 		layer: 10,
 		shape: poly,
 		backgroundColor: colorCloudFill,
 	});
 
+	const scrollable: Scrollable = new Scrollable(minX, maxX, minY, maxY);
+
 	entity.set(Transform.name, transform);
 	entity.set(Solid.name, solid);
-	entity.set(Colorable.name, colorable);
+	entity.set(Renderable.name, renderable);
+	entity.set(Scrollable.name, scrollable);
 
 	return entity;
 }

@@ -16,9 +16,11 @@ function createGround(x: number, y: number, w: number, h: number): Entity {
 		isCollisionEnabled: true,
 		isStatic: true,
 		isGravityEnabled: false,
+		isFrictionEnabled: false,
+		isVelocityEnabled: false,
 	});
 
-	const colorable: Colorable = new Colorable({
+	const renderable: Renderable = new Renderable({
 		layer: 20,
 		shape: poly,
 		backgroundColor: colorGroundFill,
@@ -26,7 +28,7 @@ function createGround(x: number, y: number, w: number, h: number): Entity {
 
 	entity.set(Transform.name, transform);
 	entity.set(Solid.name, solid);
-	entity.set(Colorable.name, colorable);
+	entity.set(Renderable.name, renderable);
 
 	return entity;
 }

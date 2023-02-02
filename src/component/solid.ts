@@ -6,26 +6,34 @@ class Solid {
 	public velocity: Force;
 
 	public isCollisionEnabled: boolean;
+	public isFrictionEnabled: boolean;
 	public isGravityEnabled: boolean;
+	public isVelocityEnabled: boolean;
 	public isStatic: boolean;
 
 	constructor(settings?: {
 		collider?: Polygon,
+		isStatic?: boolean,
+		isCollisionEnabled?: boolean,
+
 		friction?: Force,
 		gravity?: Force,
 		velocity?: Force,
-		isCollisionEnabled?: boolean,
+		
+		isFrictionEnabled?: boolean,
 		isGravityEnabled?: boolean,
-		isStatic?: boolean
+		isVelocityEnabled?: boolean,
 	}) {
 		this.collider = settings?.collider || new Polygon();
+		this.isStatic = settings?.isStatic || false;
+		this.isCollisionEnabled = settings?.isCollisionEnabled || false;
 
 		this.friction = settings?.friction || new Force();
 		this.gravity = settings?.gravity || new Force();
 		this.velocity = settings?.velocity || new Force();
 		
-		this.isCollisionEnabled = settings?.isCollisionEnabled || false;
+		this.isFrictionEnabled = settings?.isFrictionEnabled || false;
 		this.isGravityEnabled = settings?.isGravityEnabled || false;
-		this.isStatic = settings?.isStatic || false;
+		this.isVelocityEnabled = settings?.isVelocityEnabled || false;
 	}
 }

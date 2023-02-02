@@ -4,9 +4,13 @@ class Movement implements System {
 
 		for (let i = 0; i < filtered.length; i++) {
 			const entity: Entity = filtered[i];
-			
-			const transform: Transform = entity.get(Transform.name);
 			const solid: Solid = entity.get(Solid.name);
+
+			if (!solid.isVelocityEnabled) {
+				continue;
+			}
+
+			const transform: Transform = entity.get(Transform.name);
 
 			if (!transform || !solid) {
 				return;

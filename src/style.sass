@@ -26,13 +26,13 @@ $color_accent_two_medium: $color_red_50
 $color_accent_four_medium: $color_orange_50
 $color_accent_five_medium: $color_green_50
 
-$color_bg_0: hsluv.hsluv(270, 10, 6/6*10+2)
-$color_bg_1: hsluv.hsluv(270, 10, 5/6*10+2)
-$color_bg_2: hsluv.hsluv(270, 10, 4/6*10+2)
-$color_bg_3: hsluv.hsluv(270, 10, 3/6*10+2)
-$color_bg_4: hsluv.hsluv(270, 10, 2/6*10+2)
-$color_bg_5: hsluv.hsluv(270, 10, 1/6*10+2)
-$color_bg_6: hsluv.hsluv(270, 10, 0/6*10+2)
+$color_bg_0: hsluv.hsluv(270, 10, calc(6/6*10 + 2))
+$color_bg_1: hsluv.hsluv(270, 10, calc(5/6*10 + 2))
+$color_bg_2: hsluv.hsluv(270, 10, calc(4/6*10 + 2))
+$color_bg_3: hsluv.hsluv(270, 10, calc(3/6*10 + 2))
+$color_bg_4: hsluv.hsluv(270, 10, calc(2/6*10 + 2))
+$color_bg_5: hsluv.hsluv(270, 10, calc(1/6*10 + 2))
+$color_bg_6: hsluv.hsluv(270, 10, calc(0/6*10 + 2))
 
 $color_font_dark: $color_grey_3
 $color_font_light: $color_grey_95
@@ -49,9 +49,18 @@ $size_gap_m: 1rem
 $size_gap_s: 0.5rem
 $size_gap_xs: 0.2rem
 
+@media screen and (max-width: 800px)
+	body
+		grid-template-columns: 0fr 1fr 0fr !important
+		margin: 0 !important
+		grid-gap: $size_gap_s 0 !important
+
+	header, #game-canvas, #controls, #articles, footer
+		box-shadow: none !important
+
 body
 	// background: $color_bg_0
-	background-image: linear-gradient(135deg, $color_bg_0 0%, $color_bg_0 1/6*100%, $color_bg_1 1/6*100%, $color_bg_1 2/6*100%, $color_bg_2 2/6*100%, $color_bg_2 3/6*100%, $color_bg_3 3/6*100%, $color_bg_3 4/6*100%, $color_bg_4 4/6*100%, $color_bg_4 5/6*100%, $color_bg_5 5/6*100%, $color_bg_5 6/6*100%)
+	background-image: linear-gradient(135deg, $color_bg_0 0%, $color_bg_0 calc(1/6*100%), $color_bg_1 calc(1/6*100%), $color_bg_1 calc(2/6*100%), $color_bg_2 calc(2/6*100%), $color_bg_2 calc(3/6*100%), $color_bg_3 calc(3/6*100%), $color_bg_3 calc(4/6*100%), $color_bg_4 calc(4/6*100%), $color_bg_4 calc(5/6*100%), $color_bg_5 calc(5/6*100%), $color_bg_5 calc(6/6*100%))
 	color: $color_font_light
 	display: grid
 	font-family: $font_family_page
@@ -119,11 +128,12 @@ li:not(:first-of-type)
 	padding: $size_gap_xs 0 0 0
 
 #game-canvas
-	aspect-ratio: 16 / 9
-	box-shadow: $size_gap_s $size_gap_s $color_accent_one_medium
 	grid-column: 2
+	box-shadow: $size_gap_s $size_gap_s $color_accent_one_medium
 	grid-row: 2
+	aspect-ratio: 16 / 9
 	width: 100%
+	display: block
 
 #controls
 	background-color: $color_main_one_dark

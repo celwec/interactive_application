@@ -3,6 +3,16 @@
   font-weight: light;
   src: url("assets/fonts/Quicksand-Light.ttf");
 }
+@media screen and (max-width: 800px) {
+  body {
+    grid-template-columns: 0fr 1fr 0fr !important;
+    margin: 0 !important;
+    grid-gap: 0.5rem 0 !important;
+  }
+  header, #game-canvas, #controls, #articles, footer {
+    box-shadow: none !important;
+  }
+}
 body {
   background-image: linear-gradient(135deg, rgb(32, 31, 39) 0%, rgb(32, 31, 39) 16.6666666667%, rgb(28, 27, 35) 16.6666666667%, rgb(28, 27, 35) 33.3333333333%, rgb(25, 24, 31) 33.3333333333%, rgb(25, 24, 31) 50%, rgb(22, 21, 27) 50%, rgb(22, 21, 27) 66.6666666667%, rgb(18, 17, 23) 66.6666666667%, rgb(18, 17, 23) 83.3333333333%, rgb(13, 13, 17) 83.3333333333%, rgb(13, 13, 17) 100%);
   color: rgb(241, 241, 241);
@@ -83,11 +93,12 @@ li:not(:first-of-type) {
 }
 
 #game-canvas {
-  aspect-ratio: 16/9;
-  box-shadow: 0.5rem 0.5rem rgb(0, 134, 124);
   grid-column: 2;
+  box-shadow: 0.5rem 0.5rem rgb(0, 134, 124);
   grid-row: 2;
+  aspect-ratio: 16/9;
   width: 100%;
+  display: block;
 }
 
 #controls {

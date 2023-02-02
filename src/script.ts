@@ -10,10 +10,13 @@
 ///<reference path="component/player.ts" />
 ///<reference path="component/transform.ts" />
 ///<reference path="component/solid.ts" />
-///<reference path="component/colorable.ts" />
+///<reference path="component/renderable.ts" />
+///<reference path="component/message.ts" />
+///<reference path="component/scrollable.ts" />
 
 ///<reference path="system/movement.ts" />
 ///<reference path="system/physics.ts" />
+///<reference path="system/scrolling.ts" />
 
 ///<reference path="core/app.ts" />
 
@@ -21,6 +24,7 @@
 ///<reference path="game/statics.ts" />
 ///<reference path="game/clouds.ts" />
 ///<reference path="game/stars.ts" />
+///<reference path="game/messages.ts" />
 
 const entities: EntityArray = new EntityArray();
 const systems: SystemArray = new SystemArray();
@@ -38,10 +42,15 @@ for (let i = 0; i < 50; i++) {
 }
 
 for (let i = 0; i < 300; i++) {
-	entities.push(createStar(-2000, 9700, -700, 0));
+	entities.push(createStar(-2000, 9700, -800, 0));
 }
+
+entities.push(createMessage("Welcome to the interactive application!\n\nTo walk left and right\nuse the arrow keys left and right,\nor use the A and D keys.", 0, -400, "center"));
 
 systems.push(new Movement());
 systems.push(new Physics());
 
-const app: App = new App(entities, systems);
+const app: App = new App({
+	entities: entities,
+	systems: systems,
+});

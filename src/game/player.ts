@@ -23,8 +23,10 @@ function createPlayer(x: number, y: number): Entity {
 		isCollisionEnabled: true,
 		isGravityEnabled: true,
 		isStatic: false,
+		isVelocityEnabled: true,
+		isFrictionEnabled: true,
 	});
-	const colorable: Colorable = new Colorable({
+	const renderable: Renderable = new Renderable({
 		layer: 100,
 		shape: poly,
 		backgroundColor: colorGroundFill,
@@ -33,7 +35,7 @@ function createPlayer(x: number, y: number): Entity {
 	entity.set(Player.name, player);
 	entity.set(Transform.name, transform);
 	entity.set(Solid.name, solid);
-	entity.set(Colorable.name, colorable);
+	entity.set(Renderable.name, renderable);
 
 	return entity;
 }

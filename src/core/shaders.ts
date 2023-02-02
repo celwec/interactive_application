@@ -1,9 +1,14 @@
 const vertexShaderCode: string = `
 	attribute vec2 a_position;
+	attribute vec2 a_texcoord;
+
 	uniform mat3 u_matrix;
+
+	varying vec2 v_texcoord;
 
 	void main() {
 		gl_Position = vec4((u_matrix * vec3(a_position, 1)).xy, 0, 1);
+		v_texcoord = a_texcoord;
 	}
 `;
 
@@ -11,9 +16,13 @@ const fragmentShaderCode: string = `
 	precision mediump float;
 
 	uniform vec4 u_color;
+	uniform sampler2D u_texture;
+
+	varying vec2 v_texcoord;
 
 	void main() {
-		gl_FragColor = u_color;
+		gl_FragColor = u_color * texture2D(u_texture, v_texcoord);
+		// gl_FragColor = u_color;
 	}
 `;
 
