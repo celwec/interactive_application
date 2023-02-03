@@ -1,7 +1,9 @@
 class Scrolling implements System {
 	update(entities: EntityArray): void {
-		for (let i = 0; i < entities.length; i++) {
-			const entity: Entity = entities[i];
+		const filtered: EntityArray = entities.all([Transform, Scrollable]);
+
+		for (let i = 0; i < filtered.length; i++) {
+			const entity: Entity = filtered[i];
 			const transform: Transform = entity.get(Transform.name);
 			const scrollable: Scrollable = entity.get(Scrollable.name);
 

@@ -38,6 +38,16 @@ class Entity extends Map {
 }
 
 class EntityArray extends Array {
+	constructor(entities?: Entity[]) {
+		super();
+
+		if (!entities) {
+			return;
+		}
+		
+		this.push(entities);
+	}
+
 	public all(components: Array<new () => Component>): EntityArray {
 		let filtered: EntityArray = new EntityArray();
 

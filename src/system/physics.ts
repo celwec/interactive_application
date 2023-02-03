@@ -164,4 +164,66 @@ class Physics implements System {
 
 		return false;
 	}
+
+	static SAT(sa: Solid, ta: Transform, tr: Triggerable): boolean {
+		for (let i = 0; i < sa.collider.normals.length; i++) {
+			const normal: Vector = sa.collider.normals[i];
+
+			let maxA: number = -Infinity;
+			let maxB: number = -Infinity;
+			let minA: number = Infinity;
+			let minB: number = Infinity;
+			
+			for (let j = 0; j < sa.collider.points.length; j++) {
+				const vertex: Point = sa.collider.points[j].add(ta.position);
+				const dot: number = vertex.toVector().dot(normal);
+
+				maxA = Math.max(maxA, dot);
+				minA = Math.min(minA, dot);
+			}
+
+			for (let j = 0; j < tr.collider.points.length; j++) {
+				const vertex: Point = tr.collider.points[j].add(tr.position);
+				const dot: number = vertex.toVector().dot(normal);
+
+				maxB = Math.max(maxB, dot);
+				minB = Math.min(minB, dot);
+			}
+
+			if (maxA < minB || maxB < minA) {
+				return false;
+			}
+		}
+		
+		for (let i = 0; i < tr.collider.normals.length; i++) {
+			const normal: Vector = sa.collider.normals[i];
+
+			let maxA: number = -Infinity;
+			let maxB: number = -Infinity;
+			let minA: number = Infinity;
+			let minB: number = Infinity;
+			
+			for (let j = 0; j < sa.collider.points.length; j++) {
+				const vertex: Point = sa.collider.points[j].add(ta.position);
+				const dot: number = vertex.toVector().dot(normal);
+
+				maxA = Math.max(maxA, dot);
+				minA = Math.min(minA, dot);
+			}
+
+			for (let j = 0; j < tr.collider.points.length; j++) {
+				const vertex: Point = tr.collider.points[j].add(tr.position);
+				const dot: number = vertex.toVector().dot(normal);
+
+				maxB = Math.max(maxB, dot);
+				minB = Math.min(minB, dot);
+			}
+
+			if (maxA < minB || maxB < minA) {
+				return false;
+			}
+		}
+
+		return true;
+	}
 }

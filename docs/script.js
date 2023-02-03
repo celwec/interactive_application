@@ -32,6 +32,13 @@ class Entity extends Map {
     }
 }
 class EntityArray extends Array {
+    constructor(entities) {
+        super();
+        if (!entities) {
+            return;
+        }
+        this.push(entities);
+    }
     all(components) {
         let filtered = new EntityArray();
         for (let i = 0; i < this.length; i++) {
@@ -523,7 +530,6 @@ const colorGroundFill = [4 / 255, 3 / 255, 8 / 255, 1];
 const colorCloudFill = [234 / 255, 0 / 255, 100 / 255, 1];
 const colorStarFill = [0 / 255, 192 / 255, 178 / 255, 1];
 const colorBuildingFill = [17 / 255, 14 / 255, 35 / 255, 1];
-const colorWindowFill = [240 / 255, 240 / 255, 240 / 255, 1];
 class Player {
     runSpeed;
     walkSpeed;
@@ -633,7 +639,6 @@ class Message {
     backgroundColor;
     borderColor;
     borderWidth;
-    content;
     currentIndex;
     fontFamily;
     fontSize;
@@ -644,13 +649,14 @@ class Message {
     texture;
     width;
     height;
+    _content;
     constructor(settings) {
         this.alignment = settings?.alignment || "left";
         this.animated = settings?.animated || false;
         this.backgroundColor = settings?.backgroundColor;
         this.borderColor = settings?.borderColor;
         this.borderWidth = settings?.borderWidth || 0;
-        this.content = settings?.content || "";
+        this._content = settings?.content || "";
         this.currentIndex = settings?.currentIndex || 0;
         this.fontFamily = settings?.fontFamily || "monospace";
         this.fontSize = settings?.fontSize || 16;
@@ -658,10 +664,43 @@ class Message {
         this.padding = settings?.padding || 0;
         this.shape = settings?.shape || new Polygon();
         this.fontColor = settings?.fontColor || "#000000";
-        const lines = this.content.split("\n");
+        const lines = this._content.split("\n");
         const fontWidth = this.fontSize * 3 / 5;
-        const w = fontWidth * this.content.split("\n").reduce((maxLength, line) => Math.max(maxLength, line.length), 0) + this.padding * 2 + this.borderWidth * 2;
-        const h = this.fontSize * this.content.split("\n").length + this.padding * 2 + this.borderWidth * 2;
+        const w = fontWidth * this._content.split("\n").reduce((maxLength, line) => Math.max(maxLength, line.length), 0) + this.padding * 2 + this.borderWidth * 2;
+        const h = this.fontSize * this._content.split("\n").length + this.padding * 2 + this.borderWidth * 2;
+        this.width = w;
+        this.height = h;
+        const buffer = new OffscreenCanvas(w, h);
+        const context = buffer.getContext("2d");
+        context.textBaseline = "top";
+        context.textAlign = this.alignment;
+        context.fillStyle = this.borderColor ? this.borderColor : "#000000";
+        context.fillRect(0, 0, w, h);
+        context.fillStyle = this.backgroundColor ? this.backgroundColor : "#000000";
+        context.fillRect(this.borderWidth, this.borderWidth, w - this.borderWidth * 2, h - this.borderWidth * 2);
+        context.font = `${this.fontSize}px ${this.fontFamily}`;
+        context.fillStyle = this.fontColor;
+        const offset = this.alignment === "left" ? this.padding + this.borderWidth : this.alignment === "center" ? w / 2 : w - this.padding - this.borderWidth;
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            context.fillText(line, offset, i * this.fontSize + this.padding + this.borderWidth);
+        }
+        createImageBitmap(buffer).then(imageBitmap => {
+            this.texture = imageBitmap;
+        });
+    }
+    get content() {
+        return this._content;
+    }
+    set content(v) {
+        this._content = v;
+        this._createTexture();
+    }
+    _createTexture() {
+        const lines = this._content.split("\n");
+        const fontWidth = this.fontSize * 3 / 5;
+        const w = fontWidth * this._content.split("\n").reduce((maxLength, line) => Math.max(maxLength, line.length), 0) + this.padding * 2 + this.borderWidth * 2;
+        const h = this.fontSize * this._content.split("\n").length + this.padding * 2 + this.borderWidth * 2;
         this.width = w;
         this.height = h;
         const buffer = new OffscreenCanvas(w, h);
@@ -690,10 +729,33 @@ class Scrollable {
     maxX;
     maxY;
     constructor(minX, maxX, minY, maxY) {
-        this.minX = minX;
-        this.maxX = maxX;
-        this.minY = minY;
-        this.maxY = maxY;
+        this.minX = minX || -1000;
+        this.maxX = maxX || 1000;
+        this.minY = minY || -1000;
+        this.maxY = maxY || 1000;
+    }
+}
+class Triggerable {
+    action;
+    collider;
+    counter;
+    isEnabled;
+    position;
+    relatedEntities;
+    constructor(settings) {
+        this.action = settings?.action || new Function();
+        this.collider = settings?.collider || new Polygon();
+        this.counter = settings?.counter || 0;
+        this.isEnabled = settings?.isEnabled || false;
+        this.position = settings?.position || Vector.zero;
+        this.relatedEntities = new EntityArray();
+    }
+    call(self, activator, entities) {
+        if (!this.isEnabled) {
+            return;
+        }
+        this.action(self, activator, entities);
+        this.counter++;
     }
 }
 class Movement {
@@ -838,11 +900,59 @@ class Physics {
         }
         return false;
     }
+    static SAT(sa, ta, tr) {
+        for (let i = 0; i < sa.collider.normals.length; i++) {
+            const normal = sa.collider.normals[i];
+            let maxA = -Infinity;
+            let maxB = -Infinity;
+            let minA = Infinity;
+            let minB = Infinity;
+            for (let j = 0; j < sa.collider.points.length; j++) {
+                const vertex = sa.collider.points[j].add(ta.position);
+                const dot = vertex.toVector().dot(normal);
+                maxA = Math.max(maxA, dot);
+                minA = Math.min(minA, dot);
+            }
+            for (let j = 0; j < tr.collider.points.length; j++) {
+                const vertex = tr.collider.points[j].add(tr.position);
+                const dot = vertex.toVector().dot(normal);
+                maxB = Math.max(maxB, dot);
+                minB = Math.min(minB, dot);
+            }
+            if (maxA < minB || maxB < minA) {
+                return false;
+            }
+        }
+        for (let i = 0; i < tr.collider.normals.length; i++) {
+            const normal = sa.collider.normals[i];
+            let maxA = -Infinity;
+            let maxB = -Infinity;
+            let minA = Infinity;
+            let minB = Infinity;
+            for (let j = 0; j < sa.collider.points.length; j++) {
+                const vertex = sa.collider.points[j].add(ta.position);
+                const dot = vertex.toVector().dot(normal);
+                maxA = Math.max(maxA, dot);
+                minA = Math.min(minA, dot);
+            }
+            for (let j = 0; j < tr.collider.points.length; j++) {
+                const vertex = tr.collider.points[j].add(tr.position);
+                const dot = vertex.toVector().dot(normal);
+                maxB = Math.max(maxB, dot);
+                minB = Math.min(minB, dot);
+            }
+            if (maxA < minB || maxB < minA) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
 class Scrolling {
     update(entities) {
-        for (let i = 0; i < entities.length; i++) {
-            const entity = entities[i];
+        const filtered = entities.all([Transform, Scrollable]);
+        for (let i = 0; i < filtered.length; i++) {
+            const entity = filtered[i];
             const transform = entity.get(Transform.name);
             const scrollable = entity.get(Scrollable.name);
             if (transform.position.x < scrollable.minX) {
@@ -856,6 +966,25 @@ class Scrolling {
             }
             else if (transform.position.y > scrollable.maxY) {
                 transform.position.y = scrollable.minY;
+            }
+        }
+    }
+}
+class Trigger {
+    update(entities) {
+        const playerEntity = entities.all([Player])[0];
+        const playerTransform = playerEntity.get(Transform.name);
+        const playerSolid = playerEntity.get(Solid.name);
+        const filtered = entities.all([Triggerable]);
+        for (let i = 0; i < filtered.length; i++) {
+            const entity = filtered[i];
+            const triggerable = entity.get(Triggerable.name);
+            if (!triggerable.isEnabled) {
+                continue;
+            }
+            const collision = Physics.SAT(playerSolid, playerTransform, triggerable);
+            if (collision) {
+                triggerable.call(entity, playerEntity, entities);
             }
         }
     }
@@ -1576,9 +1705,29 @@ function createMessage(content, x, y, alignment) {
     entity.set(Message.name, message);
     return entity;
 }
+function createTrigger(settings) {
+    const rect = new Rectangle(settings.w, settings.h);
+    const poly = new Polygon([
+        rect.topRight,
+        rect.bottomRight,
+        rect.bottomLeft,
+        rect.topLeft,
+    ]);
+    const entity = new Entity();
+    const triggerable = new Triggerable({
+        action: settings.action,
+        isEnabled: true,
+        position: new Vector(settings.x, settings.y),
+        collider: poly,
+        counter: 0,
+    });
+    entity.set(Triggerable.name, triggerable);
+    return entity;
+}
 const entities = new EntityArray();
 const systems = new SystemArray();
-entities.push(createPlayer(0, 0));
+const player = createPlayer(0, 0);
+entities.push(player);
 entities.push(createGround(-2000, -1000, 1000, 1000));
 entities.push(createGround(-2000, 0, 4000, 1000));
 entities.push(createGround(2000, -100, 1000, 1000));
@@ -1591,8 +1740,45 @@ for (let i = 0; i < 300; i++) {
     entities.push(createStar(-2000, 9700, -800, 0));
 }
 entities.push(createMessage("Welcome to the interactive application!\n\nTo walk left and right\nuse the arrow keys left and right,\nor use the A and D keys.", 0, -400, "center"));
+entities.push(createMessage("Use the space bar to jump.", 2000, -400, "center"));
+entities.push(createMessage("Hold the shift key to run.", 3100, -400, "center"));
+entities.push(createTrigger({
+    x: 3000,
+    y: 300,
+    w: 200,
+    h: 200,
+    action: (self, activator, entities) => {
+        const triggerable = self.get(Triggerable.name);
+        if (triggerable.counter === 0) {
+            const transform = activator.get(Transform.name);
+            transform.position.x = 2900;
+            transform.position.y = -132;
+            const message = createMessage("Test", transform.position.x, transform.position.y - 100, "center");
+            entities.push(message);
+            triggerable.relatedEntities.push(message);
+        }
+        else if (triggerable.counter === 1) {
+            const entity = triggerable.relatedEntities.all([Message])[0];
+            const message = entity.get(Message.name);
+            const messageTransform = entity.get(Transform.name);
+            const transform = activator.get(Transform.name);
+            transform.position.x = 2900;
+            transform.position.y = -132;
+            message.content = "You can do it!";
+            messageTransform.scale.x = message.width;
+            messageTransform.scale.y = message.height;
+        }
+        else {
+            const t = entities.all([Player])[0].get(Transform.name);
+            t.position.x = 2900;
+            t.position.y = -132;
+        }
+    },
+}));
 systems.push(new Movement());
 systems.push(new Physics());
+systems.push(new Scrolling());
+systems.push(new Trigger());
 const app = new App({
     entities: entities,
     systems: systems,
