@@ -115,10 +115,10 @@ class Polygon {
 
 		for (let i = 0; i < this.points.length; i++) {
 			const p0: Point = this.points[i];
-			const p1: Point = this.points[(i+1) % this.points.length];
+			const p1: Point = this.points[(i + 1) % this.points.length];
 			const edge: Segment = new Segment(p0.x, p0.y, p1.x, p1.y);
 			const normal: Vector = edge.toVector().normalize().normal;
-			
+
 			this.edges.push(edge);
 			this.normals.push(normal);
 		}
@@ -132,7 +132,7 @@ class Polygon {
 
 		for (let i = 0; i < this.points.length; i++) {
 			const current: Point = this.points[i];
-			const next: Point = this.points[(i+1) % this.points.length];
+			const next: Point = this.points[(i + 1) % this.points.length];
 			const center: Point = this._center();
 
 			triangles.push([current, next, center]);
@@ -158,7 +158,7 @@ class Polygon {
 
 		for (let i = 0; i < this.points.length; i++) {
 			const p: Point = this.points[i];
-			
+
 			maxX = Math.max(maxX, p.x);
 			maxY = Math.max(maxY, p.y);
 			minX = Math.min(minX, p.x);
@@ -181,7 +181,7 @@ class Polygon {
 				const previous: Point = points[(i + n - 1) % n];
 				const p: Point = points[i];
 				const next: Point = points[(i + 1) % n];
-				
+
 				triangles.push([previous, p, next]);
 				points.splice(i, 1);
 				n--;

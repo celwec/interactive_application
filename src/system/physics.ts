@@ -1,5 +1,5 @@
 class Physics implements System {
-	update(): void {
+	update(entities: EntityArray): void {
 		const filtered: EntityArray = entities.all([Solid]);
 
 		if (filtered.length < 1) {
@@ -16,14 +16,14 @@ class Physics implements System {
 			if (!sa.isCollisionEnabled) {
 				continue;
 			}
-			
-			for (let j = i+1; j < filtered.length; j++) {
+
+			for (let j = i + 1; j < filtered.length; j++) {
 				const ta: Transform = a.get(Transform.name);
 
 				if (!ta) {
 					break;
 				}
-				
+
 				const b: Entity = filtered[j];
 				const sb: Solid = b.get(Solid.name);
 
@@ -37,7 +37,12 @@ class Physics implements System {
 					continue;
 				}
 
-				this.processCollision(sa, sb, ta, tb);
+				const player: Player = a.has(Player.name)
+					? a.get(Player.name)
+					: b.has(Player.name)
+					? b.get(Player.name)
+					: undefined;
+				const collision: boolean = this._playerStaticSAT(sa, sb, ta, tb, player);
 			}
 		}
 	}
@@ -46,10 +51,10 @@ class Physics implements System {
 		if (!solid.isGravityEnabled) {
 			return;
 		}
-		
+
 		solid.velocity.linear = solid.velocity.linear.add(solid.gravity.linear);
 	}
-	
+
 	private processFriction(solid: Solid): void {
 		if (!solid.isFrictionEnabled) {
 			return;
@@ -72,7 +77,7 @@ class Physics implements System {
 		const collision: boolean = this._staticSAT(sa, sb, ta, tb);
 	}
 
-	private _staticSAT(sa: Solid, sb: Solid, ta: Transform, tb: Transform): boolean {
+	private _playerStaticSAT(sa: Solid, sb: Solid, ta: Transform, tb: Transform, player?: Player): boolean {
 		let smallestOverlap: number = Infinity;
 		let axis: Vector = new Vector();
 
@@ -83,9 +88,9 @@ class Physics implements System {
 			let maxB: number = -Infinity;
 			let minA: number = Infinity;
 			let minB: number = Infinity;
-			
+
 			for (let j = 0; j < sa.collider.points.length; j++) {
-				const vertex: Point = sa.collider.points[j].add(ta.position);
+				const vertex: Point = sa.collider.points[j].multiply(ta.scale).add(ta.position);
 				const dot: number = vertex.toVector().dot(normal);
 
 				maxA = Math.max(maxA, dot);
@@ -93,7 +98,7 @@ class Physics implements System {
 			}
 
 			for (let j = 0; j < sb.collider.points.length; j++) {
-				const vertex: Point = sb.collider.points[j].add(tb.position);
+				const vertex: Point = sb.collider.points[j].multiply(tb.scale).add(tb.position);
 				const dot: number = vertex.toVector().dot(normal);
 
 				maxB = Math.max(maxB, dot);
@@ -111,7 +116,7 @@ class Physics implements System {
 				axis = normal;
 			}
 		}
-		
+
 		for (let i = 0; i < sb.collider.normals.length; i++) {
 			const normal: Vector = sa.collider.normals[i];
 
@@ -119,9 +124,9 @@ class Physics implements System {
 			let maxB: number = -Infinity;
 			let minA: number = Infinity;
 			let minB: number = Infinity;
-			
+
 			for (let j = 0; j < sa.collider.points.length; j++) {
-				const vertex: Point = sa.collider.points[j].add(ta.position);
+				const vertex: Point = sa.collider.points[j].multiply(ta.scale).add(ta.position);
 				const dot: number = vertex.toVector().dot(normal);
 
 				maxA = Math.max(maxA, dot);
@@ -129,7 +134,7 @@ class Physics implements System {
 			}
 
 			for (let j = 0; j < sb.collider.points.length; j++) {
-				const vertex: Point = sb.collider.points[j].add(tb.position);
+				const vertex: Point = sb.collider.points[j].multiply(tb.scale).add(tb.position);
 				const dot: number = vertex.toVector().dot(normal);
 
 				maxB = Math.max(maxB, dot);
@@ -148,7 +153,7 @@ class Physics implements System {
 			}
 		}
 
-		if(tb.position.subtract(ta.position).dot(axis) > 0) {
+		if (tb.position.subtract(ta.position).dot(axis) > 0) {
 			axis = axis.multiply(-1);
 		}
 
@@ -162,7 +167,103 @@ class Physics implements System {
 			tb.position = tb.position.add(resolution);
 		}
 
-		return false;
+		if (player && axis.y > 0) {
+			player.jumpStartTime = 0;
+		}
+		return true;
+	}
+
+	private _staticSAT(sa: Solid, sb: Solid, ta: Transform, tb: Transform): boolean {
+		let smallestOverlap: number = Infinity;
+		let axis: Vector = new Vector();
+
+		for (let i = 0; i < sa.collider.normals.length; i++) {
+			const normal: Vector = sa.collider.normals[i];
+
+			let maxA: number = -Infinity;
+			let maxB: number = -Infinity;
+			let minA: number = Infinity;
+			let minB: number = Infinity;
+
+			for (let j = 0; j < sa.collider.points.length; j++) {
+				const vertex: Point = sa.collider.points[j].multiply(ta.scale).add(ta.position);
+				const dot: number = vertex.toVector().dot(normal);
+
+				maxA = Math.max(maxA, dot);
+				minA = Math.min(minA, dot);
+			}
+
+			for (let j = 0; j < sb.collider.points.length; j++) {
+				const vertex: Point = sb.collider.points[j].multiply(tb.scale).add(tb.position);
+				const dot: number = vertex.toVector().dot(normal);
+
+				maxB = Math.max(maxB, dot);
+				minB = Math.min(minB, dot);
+			}
+
+			if (maxA < minB || maxB < minA) {
+				return false;
+			}
+
+			const overlap: number = Math.min(maxA, maxB) - Math.max(minA, minB);
+
+			if (overlap < smallestOverlap) {
+				smallestOverlap = overlap;
+				axis = normal;
+			}
+		}
+
+		for (let i = 0; i < sb.collider.normals.length; i++) {
+			const normal: Vector = sa.collider.normals[i];
+
+			let maxA: number = -Infinity;
+			let maxB: number = -Infinity;
+			let minA: number = Infinity;
+			let minB: number = Infinity;
+
+			for (let j = 0; j < sa.collider.points.length; j++) {
+				const vertex: Point = sa.collider.points[j].multiply(ta.scale).add(ta.position);
+				const dot: number = vertex.toVector().dot(normal);
+
+				maxA = Math.max(maxA, dot);
+				minA = Math.min(minA, dot);
+			}
+
+			for (let j = 0; j < sb.collider.points.length; j++) {
+				const vertex: Point = sb.collider.points[j].multiply(tb.scale).add(tb.position);
+				const dot: number = vertex.toVector().dot(normal);
+
+				maxB = Math.max(maxB, dot);
+				minB = Math.min(minB, dot);
+			}
+
+			if (maxA < minB || maxB < minA) {
+				return false;
+			}
+
+			const overlap: number = Math.min(maxA, maxB) - Math.max(minA, minB);
+
+			if (overlap < smallestOverlap) {
+				smallestOverlap = overlap;
+				axis = normal;
+			}
+		}
+
+		if (tb.position.subtract(ta.position).dot(axis) > 0) {
+			axis = axis.multiply(-1);
+		}
+
+		const resolution: Vector = axis.multiply(smallestOverlap);
+
+		if (!sa.isStatic) {
+			ta.position = ta.position.add(resolution);
+		}
+
+		if (!sb.isStatic) {
+			tb.position = tb.position.add(resolution);
+		}
+
+		return true;
 	}
 
 	static SAT(sa: Solid, ta: Transform, tr: Triggerable): boolean {
@@ -173,7 +274,7 @@ class Physics implements System {
 			let maxB: number = -Infinity;
 			let minA: number = Infinity;
 			let minB: number = Infinity;
-			
+
 			for (let j = 0; j < sa.collider.points.length; j++) {
 				const vertex: Point = sa.collider.points[j].add(ta.position);
 				const dot: number = vertex.toVector().dot(normal);
@@ -194,7 +295,7 @@ class Physics implements System {
 				return false;
 			}
 		}
-		
+
 		for (let i = 0; i < tr.collider.normals.length; i++) {
 			const normal: Vector = sa.collider.normals[i];
 
@@ -202,7 +303,7 @@ class Physics implements System {
 			let maxB: number = -Infinity;
 			let minA: number = Infinity;
 			let minB: number = Infinity;
-			
+
 			for (let j = 0; j < sa.collider.points.length; j++) {
 				const vertex: Point = sa.collider.points[j].add(ta.position);
 				const dot: number = vertex.toVector().dot(normal);

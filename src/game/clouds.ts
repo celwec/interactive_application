@@ -262,9 +262,8 @@ function createCloud(minX: number, maxX: number, minY: number, maxY: number): En
 	const x: number = Math.random() * (maxX - minX) + minX;
 	const y: number = Math.random() * (maxY - minY) + minY;
 	const speed: number = Math.random() * (0.6 - 0.2) + 0.2;
-	const sx: number = Math.random() > 0.5 ? 2 : -2;
-	const sy: number = Math.random() > 0.5 ? 2 : -2;
-
+	const sx: number = Math.random() > 0.5 ? 3 : -3;
+	const sy: number = Math.random() > 0.5 ? 3 : -3;
 
 	const entity: Entity = new Entity();
 
@@ -272,7 +271,7 @@ function createCloud(minX: number, maxX: number, minY: number, maxY: number): En
 		position: new Vector(x, y),
 		scale: new Vector(sx, sy),
 	});
-	
+
 	const solid: Solid = new Solid({
 		collider: poly,
 		velocity: new Force({
@@ -284,11 +283,13 @@ function createCloud(minX: number, maxX: number, minY: number, maxY: number): En
 		isFrictionEnabled: false,
 		isVelocityEnabled: true,
 	});
-	
-	const renderable: Renderable = new Renderable({
-		layer: 10,
-		shape: poly,
+
+	const rand: number = Math.round(Math.random() * 2);
+
+	const renderable: Renderable = Renderable.polygon({
 		backgroundColor: colorCloudFill,
+		layer: rand === 0 ? 9 : 12,
+		shape: poly,
 	});
 
 	const scrollable: Scrollable = new Scrollable(minX, maxX, minY, maxY);

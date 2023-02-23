@@ -95,6 +95,75 @@ class ComponentMap extends Map {
         }
     }
 }
+class ArchetypeMap extends Map {
+    add(entity) {
+        const components = Array.from(entity.keys());
+        const permutations = this._windows(components);
+        for (let i = 0; i < permutations.length; i++) {
+            const permutation = permutations[i];
+            const hash = this._hashStr(permutation);
+            if (!this.has(hash)) {
+                this.set(hash, [entity]);
+                return;
+            }
+            const entities = this.get(hash);
+            entities.push(entity);
+        }
+    }
+    pull(components) {
+        const hash = this._hash(components);
+        if (!this.has(hash)) {
+            return new EntityArray();
+        }
+        const entities = this.get(hash);
+        return entities;
+    }
+    _hash(strings) {
+        const hash = strings.join("").toLowerCase().split("").sort().join("");
+        return hash;
+    }
+    _hashStr(string) {
+        const hash = string.toLowerCase().split("").sort().join("");
+        return hash;
+    }
+    _permutations(strings) {
+        const permutations = [];
+        for (let i = 0; i < strings.length; i++) {
+            for (let j = i; j < strings.length; j++) {
+                const slice = strings.slice(i, j + 1);
+                const variations = this._variations(slice);
+                for (let k = 0; k < variations.length; k++) {
+                    const variation = variations[k];
+                    permutations.push(variation);
+                }
+            }
+        }
+        return permutations;
+    }
+    _variations(strings) {
+        let variations = [];
+        for (let i = 0; i < strings.length; i++) {
+            variations = variations.concat(strings.join(""));
+            const shifted = strings.shift();
+            strings.push(shifted);
+        }
+        return variations;
+    }
+    _windows(strings) {
+        const permutations = [];
+        for (let size = 1; size < strings.length; size++) {
+            for (let index = 0; index < strings.length; index++) {
+                const window = strings.slice(index, (index + size) % strings.length);
+                const variations = this._variations(window);
+                for (let k = 0; k < variations.length; k++) {
+                    const variation = variations[k];
+                    permutations.push(variation);
+                }
+            }
+        }
+        return permutations;
+    }
+}
 class SystemArray extends Array {
     add(system) {
         this.push(typeof system);
@@ -133,12 +202,8 @@ class Matrix {
             b20 * a02 + b21 * a12 + b22 * a22,
         ]);
     }
-    static project(m, w, h) {
-        return new Float32Array([
-            2 / w, 0, 0,
-            0, -2 / h, 0,
-            -1, 1, 1,
-        ]);
+    static project(w, h) {
+        return new Float32Array([2 / w, 0, 0, 0, -2 / h, 0, -1, 1, 1]);
     }
     static translate(m, x, y) {
         return Matrix.multiply(m, Matrix.translation(x, y));
@@ -147,25 +212,13 @@ class Matrix {
         return Matrix.multiply(m, Matrix.scaling(x, y));
     }
     static identity() {
-        return new Float32Array([
-            1, 0, 0,
-            0, 1, 0,
-            0, 0, 1,
-        ]);
+        return new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
     }
     static translation(x, y) {
-        return new Float32Array([
-            1, 0, 0,
-            0, 1, 0,
-            x, y, 1,
-        ]);
+        return new Float32Array([1, 0, 0, 0, 1, 0, x, y, 1]);
     }
     static scaling(x, y) {
-        return new Float32Array([
-            x, 0, 0,
-            0, y, 0,
-            0, 0, 1,
-        ]);
+        return new Float32Array([x, 0, 0, 0, y, 0, 0, 0, 1]);
     }
 }
 class Vector {
@@ -261,46 +314,48 @@ class Force {
         this.scalar = settings?.scalar || new Vector(1, 1);
     }
 }
+class Frame {
+    delayMs;
+    height;
+    texture;
+    width;
+    xOffset;
+    yOffset;
+    constructor(url, xOffset, yOffset, width, height, delayMs) {
+        this.delayMs = delayMs;
+        this.height = height;
+        this.width = width;
+        this.xOffset = xOffset;
+        this.yOffset = yOffset;
+        const off = new OffscreenCanvas(width, height);
+        const ctx = off.getContext("2d");
+        const image = new Image();
+        image.src = url;
+        const sx = xOffset;
+        const sy = yOffset;
+        const sw = width;
+        const sh = height;
+        const dx = 0;
+        const dy = 0;
+        const dw = width;
+        const dh = height;
+        ctx.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
+        this.texture = off.transferToImageBitmap();
+    }
+}
 function lerp(a, b, t) {
     return a + (b - a) * t;
 }
 function clamp(val, min, max) {
     return Math.min(Math.max(val, min), max);
 }
-function initWebGL2(context) {
-    const vertexShader = createShader(context, context.VERTEX_SHADER, vertexShaderCode);
-    const fragmentShader = createShader(context, context.FRAGMENT_SHADER, fragmentShaderCode);
-    if (!vertexShader || !fragmentShader) {
-        console.error("Could not create shaders");
-        return;
-    }
-    this._program = createProgram(context, vertexShader, fragmentShader);
-    if (!this._program) {
-        console.error("Could not create program");
-        return;
-    }
-    this._positionAttributeLocation = context.getAttribLocation(this._program, "a_position");
-    this._texcoordAttributeLocation = context.getAttribLocation(this._program, "a_texcoord");
-    this._matrixUniformLocation = context.getUniformLocation(this._program, "u_matrix");
-    this._colorUniformLocation = context.getUniformLocation(this._program, "u_color");
-    if (!this._matrixUniformLocation || !this._colorUniformLocation) {
-        console.error("Could not get uniform location");
-        return;
-    }
-    this._positionBuffer = context.createBuffer();
-    if (!this._positionBuffer) {
-        console.error("Could not create position buffer");
-        return;
-    }
-    context.bindBuffer(context.ARRAY_BUFFER, this._positionBuffer);
-    context.viewport(0, 0, this._canvasWidth, this._canvasHeight);
-    context.clearColor(28 / 255, 22 / 255, 58 / 255, 1);
-    const texture = context.createTexture();
-    context.bindTexture(context.TEXTURE_2D, texture);
-    context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, 1, 1, 0, context.RGBA, context.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
-    context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MIN_FILTER, context.LINEAR);
-    context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_S, context.CLAMP_TO_EDGE);
-    context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_T, context.CLAMP_TO_EDGE);
+function rgbaToHex(rgba) {
+    const hex = rgba
+        .map((color) => Math.round(color * 255)
+        .toString(16)
+        .padStart(2, "0"))
+        .join("");
+    return "#" + hex;
 }
 class Point {
     x;
@@ -490,7 +545,6 @@ const fragmentShaderCode = `
 
 	void main() {
 		gl_FragColor = u_color * texture2D(u_texture, v_texcoord);
-		// gl_FragColor = u_color;
 	}
 `;
 function createShader(gl, type, source) {
@@ -530,6 +584,12 @@ const colorGroundFill = [4 / 255, 3 / 255, 8 / 255, 1];
 const colorCloudFill = [234 / 255, 0 / 255, 100 / 255, 1];
 const colorStarFill = [0 / 255, 192 / 255, 178 / 255, 1];
 const colorBuildingFill = [17 / 255, 14 / 255, 35 / 255, 1];
+const colorMessageFill = [17 / 255, 13 / 255, 40 / 255, 1];
+const colorSkillFill = [228 / 255, 157 / 255, 0 / 255, 1];
+const colorCodeFill = [52 / 255, 103 / 255, 97 / 255, 1];
+const colorMessageStroke = [234 / 255, 0 / 255, 100 / 255, 1];
+const colorCodeStroke = [0 / 255, 192 / 255, 178 / 255, 1];
+const colorSkillStroke = [0, 0, 0, 1];
 class Player {
     runSpeed;
     walkSpeed;
@@ -541,6 +601,7 @@ class Player {
     jumpEndY;
     jumpHeight;
     isCasting;
+    isGravityReversed;
     constructor() {
         this.walkSpeed = 1;
         this.runSpeed = 2;
@@ -552,6 +613,7 @@ class Player {
         this.jumpEndY = 0;
         this.jumpHeight = 200;
         this.isCasting = false;
+        this.isGravityReversed = false;
     }
     get jumpFinished() {
         return performance.now() - this.jumpStartTime > this.jumpDurationMs;
@@ -582,11 +644,7 @@ class Transform {
         const rs = this.rotation.y;
         const sx = this.scale.x;
         const sy = this.scale.y;
-        return new Float32Array([
-            rc * sx, -rs, 0,
-            rs, rc * sy, 0,
-            tx, ty, 1,
-        ]);
+        return new Float32Array([rc * sx, -rs, 0, rs, rc * sy, 0, tx, ty, 1]);
     }
     set matrix(m) {
         this.position.x = m[6];
@@ -621,16 +679,231 @@ class Solid {
 }
 class Renderable {
     backgroundColor;
-    borderColor;
-    borderWidth;
+    height;
+    isRendered;
     layer;
     shape;
-    constructor(settings) {
-        this.backgroundColor = settings?.backgroundColor;
-        this.borderColor = settings?.borderColor;
-        this.borderWidth = settings?.borderWidth || 0;
-        this.layer = settings?.layer || 0;
-        this.shape = settings?.shape || new Polygon();
+    texture;
+    type;
+    width;
+    alignment;
+    animations;
+    borderColor;
+    borderWidth;
+    content;
+    currentAnimation;
+    fillStyle;
+    fontColor;
+    fontFamily;
+    fontSize;
+    frameIndex;
+    padding;
+    url;
+    autobreak;
+    static message(config) {
+        const renderable = new Renderable();
+        renderable.isRendered = config.isRendered || true;
+        renderable.alignment = config.alignment || "left";
+        renderable.backgroundColor = [1, 1, 1, 1];
+        renderable.borderColor = config.borderColor;
+        renderable.borderWidth = config.borderWidth || 0;
+        renderable.content = config.content || "";
+        renderable.fillStyle = config.fillStyle;
+        renderable.fontColor = config.fontColor || "#000000";
+        renderable.fontFamily = config.fontFamily || "monospace";
+        renderable.fontSize = config.fontSize || 16;
+        renderable.layer = config.layer || 0;
+        renderable.padding = config.padding || 0;
+        renderable.shape = config.shape || new Polygon();
+        renderable.type = "message";
+        renderable.autobreak = config.autobreak;
+        if (renderable.autobreak > 0) {
+            let charOffset = 0;
+            for (let i = 0; i < renderable.content.length; i++) {
+                let char = renderable.content[i];
+                if (char === "_") {
+                    renderable.content =
+                        renderable.content.substring(0, i) + "\n\n" + renderable.content.substring(i + "_".length);
+                    charOffset = i - 1;
+                }
+                if ((i - charOffset) % renderable.autobreak === 0) {
+                    if (char === " ") {
+                        renderable.content =
+                            renderable.content.substring(0, i) + "\n" + renderable.content.substring(i + "\n".length);
+                    }
+                    else {
+                        const n = renderable.content.lastIndexOf(" ", i);
+                        renderable.content =
+                            renderable.content.substring(0, n) + "\n" + renderable.content.substring(n + "\n".length);
+                    }
+                }
+            }
+        }
+        if (renderable.content.indexOf("\n") === 0) {
+            renderable.content = renderable.content.slice(1);
+        }
+        const lines = renderable.content.split("\n");
+        const fontWidth = (renderable.fontSize * 3) / 5;
+        const w = fontWidth *
+            renderable.content
+                .split("\n")
+                .reduce((maxLength, line) => Math.max(maxLength, line.length), 0) +
+            renderable.padding * 2 +
+            renderable.borderWidth * 2;
+        const h = renderable.fontSize * lines.length + renderable.padding * 2 + renderable.borderWidth * 2 - 4;
+        renderable.width = w;
+        renderable.height = h;
+        const buffer = new OffscreenCanvas(w, h);
+        const context = buffer.getContext("2d");
+        context.textBaseline = "top";
+        context.textAlign = renderable.alignment;
+        if (renderable.borderWidth > 1 && renderable.borderColor) {
+            context.fillStyle = rgbaToHex(renderable.borderColor);
+            context.fillRect(0, 0, w, h);
+        }
+        if (renderable.fillStyle) {
+            context.fillStyle = rgbaToHex(renderable.fillStyle);
+            context.fillRect(renderable.borderWidth, renderable.borderWidth, w - renderable.borderWidth * 2, h - renderable.borderWidth * 2);
+        }
+        context.font = `${renderable.fontSize}px ${renderable.fontFamily}`;
+        context.fillStyle = renderable.fontColor;
+        const offset = renderable.alignment === "left"
+            ? renderable.padding + renderable.borderWidth
+            : renderable.alignment === "center"
+                ? w / 2
+                : w - renderable.padding - renderable.borderWidth;
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            context.fillText(line, offset, i * renderable.fontSize + renderable.padding + renderable.borderWidth);
+        }
+        renderable.texture = buffer.transferToImageBitmap();
+        return renderable;
+    }
+    static polygon(config) {
+        const renderable = new Renderable();
+        renderable.isRendered = config.isRendered || true;
+        renderable.backgroundColor = config.backgroundColor || [1, 1, 1, 1];
+        renderable.borderColor = config.borderColor;
+        renderable.borderWidth = config.borderWidth;
+        renderable.layer = config.layer || 0;
+        renderable.shape = config.shape || new Polygon();
+        renderable.type = "polygon";
+        renderable.width = 1;
+        renderable.height = 1;
+        const off = new OffscreenCanvas(1, 1);
+        const ctx = off.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, 1, 1);
+        renderable.texture = off;
+        return renderable;
+    }
+    static sprite(config) {
+        const rect = new Rectangle(1, 1);
+        const poly = new Polygon([rect.topLeft, rect.topRight, rect.bottomLeft, rect.bottomRight]);
+        const renderable = new Renderable();
+        const image = new Image();
+        image.src = config.url;
+        renderable.isRendered = config.isRendered || true;
+        renderable.animations = config.animations || new Map();
+        renderable.backgroundColor = [1, 1, 1, 1];
+        renderable.currentAnimation = config.currentAnimation || "idle";
+        renderable.frameIndex = config.frameIndex || 0;
+        renderable.height = image.height;
+        renderable.layer = config.layer || 0;
+        renderable.shape = config.shape || new Polygon();
+        renderable.shape = poly;
+        renderable.texture = image;
+        renderable.type = "sprite";
+        renderable.width = image.width;
+        return renderable;
+    }
+    static skillUp(config) {
+        const poly = new Polygon([
+            new Point(0.215, 0.264),
+            new Point(-0.0819, -0.0375),
+            new Point(-0.0816, 0.0381),
+            new Point(0.00868, -0.0934),
+            new Point(-0.0598, -0.0697),
+            new Point(0.0873, -0.0202),
+            new Point(0.0447, -0.0813),
+            new Point(0.0452, 0.0809),
+            new Point(0.0874, 0.0195),
+            new Point(-0.0593, 0.0702),
+        ]);
+        const renderable = new Renderable();
+        renderable.isRendered = config.isRendered || true;
+        renderable.backgroundColor = config.backgroundColor || colorSkillFill;
+        renderable.type = "polygon";
+        renderable.width = 1;
+        renderable.height = 1;
+        renderable.layer = config.layer || 110;
+        renderable.shape = poly;
+        const off = new OffscreenCanvas(1, 1);
+        const ctx = off.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, 1, 1);
+        renderable.texture = off;
+        return renderable;
+    }
+    set Content(text) {
+        this.content = text;
+        this._createTexture();
+    }
+    nextFrame() {
+        if (this.animations === undefined || this.frameIndex === undefined || this.currentAnimation === undefined) {
+            return;
+        }
+        const animation = this.animations.get(this.currentAnimation);
+        if (!animation) {
+            return;
+        }
+        const frame = animation[this.frameIndex];
+        this.texture = frame.texture;
+    }
+    _createTexture() {
+        if (!this.content ||
+            !this.fontSize ||
+            !this.padding ||
+            !this.borderWidth ||
+            !this.alignment ||
+            !this.fontColor) {
+            return;
+        }
+        const lines = this.content.split("\n");
+        const fontWidth = (this.fontSize * 3) / 5;
+        const w = fontWidth *
+            this.content
+                .split("\n")
+                .reduce((maxLength, line) => Math.max(maxLength, line.length), 0) +
+            this.padding * 2 +
+            this.borderWidth * 2;
+        const h = this.fontSize * this.content.split("\n").length + this.padding * 2 + this.borderWidth * 2;
+        this.width = w;
+        this.height = h;
+        const buffer = new OffscreenCanvas(w, h);
+        const context = buffer.getContext("2d");
+        context.textBaseline = "top";
+        context.textAlign = this.alignment;
+        if (this.borderWidth > 1 && this.borderColor) {
+            context.fillStyle = rgbaToHex(this.borderColor);
+            context.fillRect(0, 0, w, h);
+        }
+        if (this.fillStyle) {
+            context.fillStyle = rgbaToHex(this.fillStyle);
+            context.fillRect(this.borderWidth, this.borderWidth, w - this.borderWidth * 2, h - this.borderWidth * 2);
+        }
+        context.font = `${this.fontSize}px ${this.fontFamily}`;
+        context.fillStyle = this.fontColor;
+        const offset = this.alignment === "left"
+            ? this.padding + this.borderWidth
+            : this.alignment === "center"
+                ? w / 2
+                : w - this.padding - this.borderWidth;
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            context.fillText(line, offset, i * this.fontSize + this.padding + this.borderWidth);
+        }
+        this.texture = buffer;
     }
 }
 class Message {
@@ -737,25 +1010,44 @@ class Scrollable {
 }
 class Triggerable {
     action;
+    actionOnLeave;
     collider;
     counter;
+    isButtonEnabled;
+    isColliding;
     isEnabled;
+    isSolid;
+    lastTriggered;
     position;
     relatedEntities;
-    constructor(settings) {
-        this.action = settings?.action || new Function();
-        this.collider = settings?.collider || new Polygon();
-        this.counter = settings?.counter || 0;
-        this.isEnabled = settings?.isEnabled || false;
-        this.position = settings?.position || Vector.zero;
+    timeout;
+    constructor(config) {
+        this.action = config?.action || new Function();
+        this.actionOnLeave = config?.actionOnLeave || new Function();
+        this.collider = config?.collider || new Polygon();
+        this.counter = config?.counter || 0;
+        this.isEnabled = config?.isEnabled || false;
+        this.position = config?.position || Vector.zero;
         this.relatedEntities = new EntityArray();
+        this.isColliding = config?.isColliding || false;
+        this.isSolid = config?.isSolid || false;
+        this.timeout = config?.timeout || 0;
+        this.isButtonEnabled = config?.isButtonEnabled || false;
     }
     call(self, activator, entities) {
-        if (!this.isEnabled) {
+        const dt = performance.now() - this.lastTriggered;
+        if (!this.isEnabled || dt < this.timeout) {
             return;
         }
         this.action(self, activator, entities);
         this.counter++;
+        this.lastTriggered = performance.now();
+    }
+    callOnLeave(self, activator, entities) {
+        if (!this.isEnabled) {
+            return;
+        }
+        this.actionOnLeave(self, activator, entities);
     }
 }
 class Movement {
@@ -777,7 +1069,7 @@ class Movement {
     }
 }
 class Physics {
-    update() {
+    update(entities) {
         const filtered = entities.all([Solid]);
         if (filtered.length < 1) {
             return;
@@ -804,7 +1096,12 @@ class Physics {
                 if (!tb) {
                     continue;
                 }
-                this.processCollision(sa, sb, ta, tb);
+                const player = a.has(Player.name)
+                    ? a.get(Player.name)
+                    : b.has(Player.name)
+                        ? b.get(Player.name)
+                        : undefined;
+                const collision = this._playerStaticSAT(sa, sb, ta, tb, player);
             }
         }
     }
@@ -831,7 +1128,7 @@ class Physics {
     processCollision(sa, sb, ta, tb) {
         const collision = this._staticSAT(sa, sb, ta, tb);
     }
-    _staticSAT(sa, sb, ta, tb) {
+    _playerStaticSAT(sa, sb, ta, tb, player) {
         let smallestOverlap = Infinity;
         let axis = new Vector();
         for (let i = 0; i < sa.collider.normals.length; i++) {
@@ -841,13 +1138,13 @@ class Physics {
             let minA = Infinity;
             let minB = Infinity;
             for (let j = 0; j < sa.collider.points.length; j++) {
-                const vertex = sa.collider.points[j].add(ta.position);
+                const vertex = sa.collider.points[j].multiply(ta.scale).add(ta.position);
                 const dot = vertex.toVector().dot(normal);
                 maxA = Math.max(maxA, dot);
                 minA = Math.min(minA, dot);
             }
             for (let j = 0; j < sb.collider.points.length; j++) {
-                const vertex = sb.collider.points[j].add(tb.position);
+                const vertex = sb.collider.points[j].multiply(tb.scale).add(tb.position);
                 const dot = vertex.toVector().dot(normal);
                 maxB = Math.max(maxB, dot);
                 minB = Math.min(minB, dot);
@@ -868,13 +1165,13 @@ class Physics {
             let minA = Infinity;
             let minB = Infinity;
             for (let j = 0; j < sa.collider.points.length; j++) {
-                const vertex = sa.collider.points[j].add(ta.position);
+                const vertex = sa.collider.points[j].multiply(ta.scale).add(ta.position);
                 const dot = vertex.toVector().dot(normal);
                 maxA = Math.max(maxA, dot);
                 minA = Math.min(minA, dot);
             }
             for (let j = 0; j < sb.collider.points.length; j++) {
-                const vertex = sb.collider.points[j].add(tb.position);
+                const vertex = sb.collider.points[j].multiply(tb.scale).add(tb.position);
                 const dot = vertex.toVector().dot(normal);
                 maxB = Math.max(maxB, dot);
                 minB = Math.min(minB, dot);
@@ -898,7 +1195,79 @@ class Physics {
         if (!sb.isStatic) {
             tb.position = tb.position.add(resolution);
         }
-        return false;
+        if (player && axis.y > 0) {
+            player.jumpStartTime = 0;
+        }
+        return true;
+    }
+    _staticSAT(sa, sb, ta, tb) {
+        let smallestOverlap = Infinity;
+        let axis = new Vector();
+        for (let i = 0; i < sa.collider.normals.length; i++) {
+            const normal = sa.collider.normals[i];
+            let maxA = -Infinity;
+            let maxB = -Infinity;
+            let minA = Infinity;
+            let minB = Infinity;
+            for (let j = 0; j < sa.collider.points.length; j++) {
+                const vertex = sa.collider.points[j].multiply(ta.scale).add(ta.position);
+                const dot = vertex.toVector().dot(normal);
+                maxA = Math.max(maxA, dot);
+                minA = Math.min(minA, dot);
+            }
+            for (let j = 0; j < sb.collider.points.length; j++) {
+                const vertex = sb.collider.points[j].multiply(tb.scale).add(tb.position);
+                const dot = vertex.toVector().dot(normal);
+                maxB = Math.max(maxB, dot);
+                minB = Math.min(minB, dot);
+            }
+            if (maxA < minB || maxB < minA) {
+                return false;
+            }
+            const overlap = Math.min(maxA, maxB) - Math.max(minA, minB);
+            if (overlap < smallestOverlap) {
+                smallestOverlap = overlap;
+                axis = normal;
+            }
+        }
+        for (let i = 0; i < sb.collider.normals.length; i++) {
+            const normal = sa.collider.normals[i];
+            let maxA = -Infinity;
+            let maxB = -Infinity;
+            let minA = Infinity;
+            let minB = Infinity;
+            for (let j = 0; j < sa.collider.points.length; j++) {
+                const vertex = sa.collider.points[j].multiply(ta.scale).add(ta.position);
+                const dot = vertex.toVector().dot(normal);
+                maxA = Math.max(maxA, dot);
+                minA = Math.min(minA, dot);
+            }
+            for (let j = 0; j < sb.collider.points.length; j++) {
+                const vertex = sb.collider.points[j].multiply(tb.scale).add(tb.position);
+                const dot = vertex.toVector().dot(normal);
+                maxB = Math.max(maxB, dot);
+                minB = Math.min(minB, dot);
+            }
+            if (maxA < minB || maxB < minA) {
+                return false;
+            }
+            const overlap = Math.min(maxA, maxB) - Math.max(minA, minB);
+            if (overlap < smallestOverlap) {
+                smallestOverlap = overlap;
+                axis = normal;
+            }
+        }
+        if (tb.position.subtract(ta.position).dot(axis) > 0) {
+            axis = axis.multiply(-1);
+        }
+        const resolution = axis.multiply(smallestOverlap);
+        if (!sa.isStatic) {
+            ta.position = ta.position.add(resolution);
+        }
+        if (!sb.isStatic) {
+            tb.position = tb.position.add(resolution);
+        }
+        return true;
     }
     static SAT(sa, ta, tr) {
         for (let i = 0; i < sa.collider.normals.length; i++) {
@@ -973,6 +1342,7 @@ class Scrolling {
 class Trigger {
     update(entities) {
         const playerEntity = entities.all([Player])[0];
+        const player = playerEntity.get(Player.name);
         const playerTransform = playerEntity.get(Transform.name);
         const playerSolid = playerEntity.get(Solid.name);
         const filtered = entities.all([Triggerable]);
@@ -982,9 +1352,16 @@ class Trigger {
             if (!triggerable.isEnabled) {
                 continue;
             }
-            const collision = Physics.SAT(playerSolid, playerTransform, triggerable);
-            if (collision) {
-                triggerable.call(entity, playerEntity, entities);
+            if (!triggerable.isButtonEnabled || (triggerable.isButtonEnabled && player.isCasting)) {
+                const collision = Physics.SAT(playerSolid, playerTransform, triggerable);
+                if (collision) {
+                    triggerable.isColliding = true;
+                    triggerable.call(entity, playerEntity, entities);
+                }
+                else if (triggerable.isColliding === true) {
+                    triggerable.isColliding = false;
+                    triggerable.callOnLeave(entity, playerEntity, entities);
+                }
             }
         }
     }
@@ -1010,6 +1387,8 @@ class App {
     _matrixUniformLocation;
     _colorUniformLocation;
     _positionBuffer;
+    _canvasRatioWidth;
+    _canvasRatioHeight;
     constructor(settings) {
         this._entities = settings.entities;
         this._systems = settings.systems;
@@ -1023,6 +1402,8 @@ class App {
         this._msPerRender = 1000 / 240;
         this._canvasWidth = settings.width || 1280;
         this._canvasHeight = settings.height || 720;
+        this._canvasRatioWidth = this._canvasWidth / 1280;
+        this._canvasRatioHeight = this._canvasHeight / 720;
         this._loop = this._loop.bind(this);
         this._processInput = this._processInput.bind(this);
         this._keyboardEventHandler = this._keyboardEventHandler.bind(this);
@@ -1066,10 +1447,11 @@ class App {
         }
         this._gl.bindBuffer(this._gl.ARRAY_BUFFER, this._positionBuffer);
         this._gl.viewport(0, 0, this._canvasWidth, this._canvasHeight);
+        this._gl.blendFunc(this._gl.SRC_ALPHA, this._gl.ONE_MINUS_SRC_ALPHA);
+        this._gl.enable(this._gl.BLEND);
         this._gl.clearColor(28 / 255, 22 / 255, 58 / 255, 1);
         const texture = this._gl.createTexture();
         this._gl.bindTexture(this._gl.TEXTURE_2D, texture);
-        this._gl.texImage2D(this._gl.TEXTURE_2D, 0, this._gl.RGBA, 1, 1, 0, this._gl.RGBA, this._gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
         this._gl.texParameteri(this._gl.TEXTURE_2D, this._gl.TEXTURE_MIN_FILTER, this._gl.LINEAR);
         this._gl.texParameteri(this._gl.TEXTURE_2D, this._gl.TEXTURE_WRAP_S, this._gl.CLAMP_TO_EDGE);
         this._gl.texParameteri(this._gl.TEXTURE_2D, this._gl.TEXTURE_WRAP_T, this._gl.CLAMP_TO_EDGE);
@@ -1121,14 +1503,22 @@ class App {
             player.jumpStartTime = performance.now();
             player.isJumping = true;
             player.jumpStartY = transform.position.y;
-            player.jumpEndY = transform.position.y - player.jumpHeight;
+            if (!player.isGravityReversed) {
+                player.jumpEndY = transform.position.y - player.jumpHeight;
+            }
+            else {
+                player.jumpEndY = transform.position.y + player.jumpHeight;
+            }
         }
         if (!this._keyStates[" "]) {
             player.isJumping = false;
         }
         if (this._keyStates[" "] && player.isJumping && !player.jumpFinished) {
-            if (transform.position.y > player.jumpEndY) {
+            if (!player.isGravityReversed && transform.position.y > player.jumpEndY) {
                 solid.velocity.linear.y = -player.jumpSpeed;
+            }
+            else if (player.isGravityReversed && transform.position.y < player.jumpEndY) {
+                solid.velocity.linear.y = player.jumpSpeed;
             }
         }
     }
@@ -1147,9 +1537,9 @@ class App {
         if (!playerTransform) {
             return;
         }
-        const filtered = this._entities.all([Transform]).any([Renderable, Message]).sort((a, b) => {
-            const ac = a.get(Renderable.name) || a.get(Message.name);
-            const bc = b.get(Renderable.name) || b.get(Message.name);
+        const filtered = this._entities.all([Transform, Renderable]).sort((a, b) => {
+            const ac = a.get(Renderable.name);
+            const bc = b.get(Renderable.name);
             return ac.layer - bc.layer;
         });
         if (filtered.length < 1) {
@@ -1169,27 +1559,24 @@ class App {
         this._gl.vertexAttribPointer(this._texcoordAttributeLocation, size, type, normalize, stride, offset);
         for (let i = 0; i < filtered.length; i++) {
             const entity = filtered[i];
+            const renderable = entity.get(Renderable.name);
+            if (!renderable.isRendered) {
+                continue;
+            }
             const transform = entity.get(Transform.name);
-            const renderable = entity.get(Renderable.name) || entity.get(Message.name);
             const shape = renderable.shape;
             const dx = transform.position.x - playerTransform.position.x;
             const dy = transform.position.y - playerTransform.position.y;
             let matrix = transform.matrix;
-            matrix = Matrix.project(matrix, this._canvasWidth, this._canvasHeight);
-            matrix = Matrix.translate(matrix, this._canvasWidth / 2 + dx, this._canvasHeight * 68 / 100 + dy);
-            matrix = Matrix.scale(matrix, transform.scale.x, transform.scale.y);
+            matrix = Matrix.project(this._canvasWidth, this._canvasHeight);
+            matrix = Matrix.translate(matrix, this._canvasWidth / 2 + dx * this._canvasRatioWidth, (this._canvasHeight * 68) / 100 + dy * this._canvasRatioHeight);
+            matrix = Matrix.scale(matrix, transform.scale.x * this._canvasRatioWidth, transform.scale.y * this._canvasRatioHeight);
             this._gl.bufferData(this._gl.ARRAY_BUFFER, new Float32Array(shape.vertices), this._gl.STATIC_DRAW);
             this._gl.uniformMatrix3fv(this._matrixUniformLocation, false, matrix);
-            if (renderable instanceof Renderable) {
-                if (!renderable.backgroundColor) {
-                    continue;
-                }
-                this._gl.uniform4f(this._colorUniformLocation, renderable.backgroundColor[0], renderable.backgroundColor[1], renderable.backgroundColor[2], renderable.backgroundColor[3]);
-                this._gl.texImage2D(this._gl.TEXTURE_2D, 0, this._gl.RGBA, 1, 1, 0, this._gl.RGBA, this._gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
-            }
-            else {
-                this._gl.uniform4f(this._colorUniformLocation, 1, 1, 1, 1);
-                this._gl.texImage2D(this._gl.TEXTURE_2D, 0, this._gl.RGBA, renderable.width, renderable.height, 0, this._gl.RGBA, this._gl.UNSIGNED_BYTE, renderable.texture);
+            this._gl.uniform4f(this._colorUniformLocation, renderable.backgroundColor[0], renderable.backgroundColor[1], renderable.backgroundColor[2], renderable.backgroundColor[3]);
+            this._gl.texImage2D(this._gl.TEXTURE_2D, 0, this._gl.RGBA, renderable.width, renderable.height, 0, this._gl.RGBA, this._gl.UNSIGNED_BYTE, renderable.texture);
+            if (renderable.type === "sprite") {
+                renderable.nextFrame();
             }
             const primitiveType = this._gl.TRIANGLES;
             const count = renderable.shape.vertices.length / 2;
@@ -1211,17 +1598,13 @@ class App {
     }
 }
 function createPlayer(x, y) {
-    const rect = new Rectangle(32, 32);
-    const poly = new Polygon([
-        rect.topLeft,
-        rect.topRight,
-        rect.bottomLeft,
-        rect.bottomRight,
-    ]);
+    const rect = new Rectangle(1, 1);
+    const poly = new Polygon([rect.topLeft, rect.topRight, rect.bottomLeft, rect.bottomRight]);
     const entity = new Entity();
     const player = new Player();
     const transform = new Transform({
         position: new Vector(x, y),
+        scale: new Vector(30, 44),
     });
     const solid = new Solid({
         collider: poly,
@@ -1237,10 +1620,9 @@ function createPlayer(x, y) {
         isVelocityEnabled: true,
         isFrictionEnabled: true,
     });
-    const renderable = new Renderable({
+    const renderable = Renderable.polygon({
         layer: 100,
         shape: poly,
-        backgroundColor: colorGroundFill,
     });
     entity.set(Player.name, player);
     entity.set(Transform.name, transform);
@@ -1248,14 +1630,59 @@ function createPlayer(x, y) {
     entity.set(Renderable.name, renderable);
     return entity;
 }
+function createBuilding(entities, x, y, w, h) {
+    const rectWindow = new Rectangle(1, 1);
+    const polyWindow = new Polygon([
+        rectWindow.topLeft,
+        rectWindow.topRight,
+        rectWindow.bottomLeft,
+        rectWindow.bottomRight,
+    ]);
+    for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 16; c++) {
+            const skip = Math.round(Math.random()) % 2 == 0;
+            if (skip) {
+                continue;
+            }
+            const entity = new Entity();
+            const bMargin = 24;
+            const wMargin = 8;
+            const sx = (w - bMargin - bMargin + wMargin) / 8 - wMargin;
+            const sy = (h - bMargin * 2) / 20 - wMargin;
+            const px = x + bMargin + (sx + wMargin) * r;
+            const py = y + bMargin + (sy + wMargin) * c;
+            const transform = new Transform({
+                scale: new Vector(sx, sy),
+                position: new Vector(px, py),
+            });
+            const renderable = Renderable.polygon({
+                backgroundColor: [0.9, 0.9, 1, 0.1],
+                layer: 11,
+                shape: polyWindow,
+            });
+            entity.set(Transform.name, transform);
+            entity.set(Renderable.name, renderable);
+            entities.push(entity);
+        }
+    }
+    const rect = new Rectangle(w, h);
+    const poly = new Polygon([rect.topLeft, rect.topRight, rect.bottomLeft, rect.bottomRight]);
+    const entity = new Entity();
+    const transform = new Transform({
+        position: new Vector(x, y),
+    });
+    const renderable = Renderable.polygon({
+        backgroundColor: colorBuildingFill,
+        layer: 10,
+        shape: poly,
+    });
+    entity.set(Transform.name, transform);
+    entity.set(Renderable.name, renderable);
+    return entity;
+}
 function createGround(x, y, w, h) {
     const rect = new Rectangle(w, h);
-    const poly = new Polygon([
-        rect.topLeft,
-        rect.topRight,
-        rect.bottomLeft,
-        rect.bottomRight,
-    ]);
+    const poly = new Polygon([rect.topLeft, rect.topRight, rect.bottomLeft, rect.bottomRight]);
     const entity = new Entity();
     const transform = new Transform({
         position: new Vector(x, y),
@@ -1268,10 +1695,10 @@ function createGround(x, y, w, h) {
         isFrictionEnabled: false,
         isVelocityEnabled: false,
     });
-    const renderable = new Renderable({
+    const renderable = Renderable.polygon({
+        backgroundColor: colorGroundFill,
         layer: 20,
         shape: poly,
-        backgroundColor: colorGroundFill,
     });
     entity.set(Transform.name, transform);
     entity.set(Solid.name, solid);
@@ -1541,8 +1968,8 @@ function createCloud(minX, maxX, minY, maxY) {
     const x = Math.random() * (maxX - minX) + minX;
     const y = Math.random() * (maxY - minY) + minY;
     const speed = Math.random() * (0.6 - 0.2) + 0.2;
-    const sx = Math.random() > 0.5 ? 2 : -2;
-    const sy = Math.random() > 0.5 ? 2 : -2;
+    const sx = Math.random() > 0.5 ? 3 : -3;
+    const sy = Math.random() > 0.5 ? 3 : -3;
     const entity = new Entity();
     const transform = new Transform({
         position: new Vector(x, y),
@@ -1559,10 +1986,11 @@ function createCloud(minX, maxX, minY, maxY) {
         isFrictionEnabled: false,
         isVelocityEnabled: true,
     });
-    const renderable = new Renderable({
-        layer: 10,
-        shape: poly,
+    const rand = Math.round(Math.random() * 2);
+    const renderable = Renderable.polygon({
         backgroundColor: colorCloudFill,
+        layer: rand === 0 ? 9 : 12,
+        shape: poly,
     });
     const scrollable = new Scrollable(minX, maxX, minY, maxY);
     entity.set(Transform.name, transform);
@@ -1601,7 +2029,7 @@ function createStar(minX, maxX, minY, maxY) {
         isFrictionEnabled: false,
         isVelocityEnabled: true,
     });
-    const renderable = new Renderable({
+    const renderable = Renderable.polygon({
         backgroundColor: colorStarFill,
         layer: 0,
         shape: poly,
@@ -1613,165 +2041,588 @@ function createStar(minX, maxX, minY, maxY) {
     entity.set(Scrollable.name, scrollable);
     return entity;
 }
-function createStarMap(amount, minX, maxX, minY, maxY) {
-    const entity = new Entity();
-    const transform = new Transform({
-        position: new Vector(-500, -500),
-    });
-    const solid = new Solid({
-        isCollisionEnabled: false,
-        isFrictionEnabled: false,
-        isGravityEnabled: false,
-        isVelocityEnabled: true,
-        isStatic: false,
-        velocity: new Force({
-            linear: new Vector(-0.2, 0),
-        }),
-    });
-    const buffer = new OffscreenCanvas(maxX, maxY);
-    const context = buffer.getContext("webgl2");
-    initWebGL2(context);
-    context.clear(context.COLOR_BUFFER_BIT);
-    context.useProgram(this._program);
-    context.enableVertexAttribArray(this._positionAttributeLocation);
-    context.enableVertexAttribArray(this._texcoordAttributeLocation);
-    context.bindBuffer(context.ARRAY_BUFFER, this._positionBuffer);
-    const size = 2;
-    const type = context.FLOAT;
-    const normalize = false;
-    const stride = 0;
-    const offset = 0;
-    context.vertexAttribPointer(this._positionAttributeLocation, size, type, normalize, stride, offset);
-    context.vertexAttribPointer(this._texcoordAttributeLocation, size, type, normalize, stride, offset);
-    for (let i = 0; i < amount; i++) {
-        const entity = createStar(minX, maxX, minY, maxY);
-        const transform = entity.get(Transform.name);
-        const renderable = entity.get(Renderable.name) || entity.get(Message.name);
-        const shape = renderable.shape;
-        const dx = transform.position.x;
-        const dy = transform.position.y;
-        let matrix = transform.matrix;
-        matrix = Matrix.project(matrix, this._canvasWidth, this._canvasHeight);
-        matrix = Matrix.translate(matrix, this._canvasWidth / 2 + dx, this._canvasHeight * 68 / 100 + dy);
-        matrix = Matrix.scale(matrix, transform.scale.x, transform.scale.y);
-        context.bufferData(context.ARRAY_BUFFER, new Float32Array(shape.vertices), context.STATIC_DRAW);
-        context.uniformMatrix3fv(this._matrixUniformLocation, false, matrix);
-        if (renderable instanceof Renderable) {
-            if (!renderable.backgroundColor) {
-                return;
-            }
-            context.uniform4f(this._colorUniformLocation, renderable.backgroundColor[0], renderable.backgroundColor[1], renderable.backgroundColor[2], renderable.backgroundColor[3]);
-            context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, 1, 1, 0, context.RGBA, context.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
-        }
-        else {
-            context.uniform4f(this._colorUniformLocation, 1, 1, 1, 1);
-            context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, renderable.width, renderable.height, 0, context.RGBA, context.UNSIGNED_BYTE, renderable.texture);
-        }
-        const primitiveType = context.TRIANGLES;
-        const count = renderable.shape.vertices.length / 2;
-        context.drawArrays(primitiveType, offset, count);
-    }
-    return entity;
-}
-function createMessage(content, x, y, alignment) {
+function createMessage(config) {
     const rect = new Rectangle(1, 1);
-    const poly = new Polygon([
-        rect.topLeft,
-        rect.topRight,
-        rect.bottomLeft,
-        rect.bottomRight,
-    ]);
+    const poly = new Polygon([rect.topLeft, rect.topRight, rect.bottomLeft, rect.bottomRight]);
     const entity = new Entity();
-    const message = new Message({
-        alignment: alignment,
-        animated: true,
-        backgroundColor: "#110d28",
-        borderColor: "#ea0064",
+    const renderable = Renderable.message({
+        alignment: config.alignment,
+        fillStyle: config.backgroundColor,
+        borderColor: config.borderColor,
         borderWidth: 4,
-        content: content,
-        fontFamily: "monospace",
+        content: config.content,
         fontSize: 20,
         padding: 16,
         shape: poly,
         fontColor: "#f0f0f0",
         layer: 60,
+        autobreak: config.autobreak,
     });
-    const width = message.alignment === "left" ? 0 : message.alignment === "center" ? message.width / 2 : message.width;
+    const width = renderable.alignment === "left"
+        ? 0
+        : renderable.alignment === "center"
+            ? renderable.width / 2
+            : renderable.width;
     const transform = new Transform({
-        position: new Vector(x - width, y),
-        scale: new Vector(message.width, message.height),
+        position: new Vector(config.x - width, config.y),
+        scale: new Vector(renderable.width, renderable.height),
     });
+    entity.set(Renderable.name, renderable);
     entity.set(Transform.name, transform);
-    entity.set(Message.name, message);
     return entity;
 }
-function createTrigger(settings) {
-    const rect = new Rectangle(settings.w, settings.h);
-    const poly = new Polygon([
-        rect.topRight,
-        rect.bottomRight,
-        rect.bottomLeft,
-        rect.topLeft,
-    ]);
+function createSkillMessage(config) {
+    const rect = new Rectangle(1, 1);
+    const poly = new Polygon([rect.topLeft, rect.topRight, rect.bottomLeft, rect.bottomRight]);
+    const entity = new Entity();
+    const renderable = Renderable.message({
+        alignment: config.alignment,
+        autobreak: 32,
+        borderColor: config.borderColor,
+        borderWidth: 4,
+        content: config.content,
+        fillStyle: config.backgroundColor,
+        fontColor: "#f0f0f0",
+        fontSize: 20,
+        layer: 60,
+        padding: 16,
+        shape: poly,
+    });
+    const width = renderable.alignment === "left"
+        ? 0
+        : renderable.alignment === "center"
+            ? renderable.width / 2
+            : renderable.width;
+    const transform = new Transform({
+        position: new Vector(config.x - width, config.y),
+        scale: new Vector(renderable.width, renderable.height),
+    });
+    const solid = new Solid({
+        isCollisionEnabled: false,
+        isFrictionEnabled: true,
+        isGravityEnabled: false,
+        isVelocityEnabled: true,
+        isStatic: true,
+        velocity: new Force({
+            linear: new Vector(0, -1),
+        }),
+        friction: new Force({
+            linear: new Vector(0, 0.05),
+        }),
+    });
+    entity.set(Renderable.name, renderable);
+    entity.set(Transform.name, transform);
+    entity.set(Solid.name, solid);
+    return entity;
+}
+function createTrigger(config) {
+    const rect = new Rectangle(config.w, config.h);
+    const poly = new Polygon([rect.topRight, rect.bottomRight, rect.bottomLeft, rect.topLeft]);
     const entity = new Entity();
     const triggerable = new Triggerable({
-        action: settings.action,
-        isEnabled: true,
-        position: new Vector(settings.x, settings.y),
+        action: config.action,
+        actionOnLeave: config.actionOnLeave,
         collider: poly,
         counter: 0,
+        isEnabled: true,
+        position: new Vector(config.x, config.y),
+        timeout: config.timeout || 0,
+        isButtonEnabled: config.isButtonEnabled || false,
     });
     entity.set(Triggerable.name, triggerable);
     return entity;
 }
+function createAntiSkillUp(config) {
+    const poly = new Polygon([
+        new Point(16, 0),
+        new Point(20.797931, 10.745535),
+        new Point(32, 12.222913),
+        new Point(23.763215, 20.341395),
+        new Point(25.888542, 32),
+        new Point(16, 26.271964),
+        new Point(6.1114555, 32),
+        new Point(8.2367859, 20.341395),
+        new Point(0, 12.222912),
+        new Point(11.202069, 10.745535),
+    ]);
+    const entity = new Entity();
+    const renderable = Renderable.polygon({
+        backgroundColor: config.backgroundColor,
+        layer: 97,
+        shape: poly,
+    });
+    const transform = new Transform({
+        position: new Vector(config.x - 32, config.y),
+        scale: new Vector(2, 2),
+    });
+    const solid = new Solid({
+        isCollisionEnabled: false,
+        isFrictionEnabled: true,
+        isGravityEnabled: false,
+        isVelocityEnabled: true,
+        isStatic: true,
+        velocity: new Force({
+            linear: new Vector(0, -1),
+        }),
+        friction: new Force({
+            linear: new Vector(0, 0.05),
+        }),
+    });
+    entity.set(Renderable.name, renderable);
+    entity.set(Transform.name, transform);
+    entity.set(Solid.name, solid);
+    return entity;
+}
+function createSkillUp(config) {
+    let poly = new Polygon();
+    if (config.amount === 5) {
+        poly = new Polygon([
+            new Point(16, 0),
+            new Point(20.797931, 10.745535),
+            new Point(32, 12.222913),
+            new Point(23.763215, 20.341395),
+            new Point(25.888542, 32),
+            new Point(16, 26.271964),
+            new Point(6.1114555, 31.999999),
+            new Point(8.2367859, 20.341395),
+            new Point(0, 12.222912),
+            new Point(11.202069, 10.745535),
+        ]);
+    }
+    else if (config.amount === 4) {
+        poly = new Polygon([
+            new Point(11.202069, 10.745535),
+            new Point(16, 0),
+            new Point(20.797931, 10.745535),
+            new Point(32, 12.222913),
+            new Point(23.763215, 20.341395),
+            new Point(25.888542, 32),
+            new Point(16, 26.271964),
+            new Point(6.1114555, 31.999999),
+            new Point(8.2367859, 20.341395),
+            new Point(16, 18),
+        ]);
+    }
+    else if (config.amount === 3) {
+        poly = new Polygon([
+            new Point(11.202069, 10.745535),
+            new Point(16, 0),
+            new Point(20.797931, 10.745535),
+            new Point(32, 12.222913),
+            new Point(23.763215, 20.341395),
+            new Point(25.888542, 32),
+            new Point(16, 26.271964),
+            new Point(16, 18),
+        ]);
+    }
+    else if (config.amount === 2) {
+        poly = new Polygon([
+            new Point(11.202069, 10.745535),
+            new Point(16, 0),
+            new Point(20.797931, 10.745535),
+            new Point(32, 12.222913),
+            new Point(23.763215, 20.341395),
+            new Point(16, 18),
+        ]);
+    }
+    else if (config.amount === 1) {
+        poly = new Polygon([
+            new Point(11.202069, 10.745535),
+            new Point(16, 0),
+            new Point(20.797931, 10.745535),
+            new Point(16, 18),
+        ]);
+    }
+    const entity = new Entity();
+    const renderable = Renderable.polygon({
+        backgroundColor: config.backgroundColor,
+        borderColor: config.borderColor,
+        borderWidth: 1,
+        layer: 98,
+        shape: poly,
+    });
+    const transform = new Transform({
+        position: new Vector(config.x - 32, config.y),
+        scale: new Vector(2, 2),
+    });
+    const solid = new Solid({
+        isCollisionEnabled: false,
+        isFrictionEnabled: true,
+        isGravityEnabled: false,
+        isVelocityEnabled: true,
+        velocity: new Force({
+            linear: new Vector(0, -1),
+        }),
+        friction: new Force({
+            linear: new Vector(0, 0.05),
+        }),
+    });
+    entity.set(Renderable.name, renderable);
+    entity.set(Transform.name, transform);
+    entity.set(Solid.name, solid);
+    return entity;
+}
+function createBook(config) {
+    const rect = new Rectangle(config.w, config.h);
+    const poly = new Polygon([rect.topLeft, rect.topRight, rect.bottomLeft, rect.bottomRight]);
+    const entity = new Entity();
+    const triggerable = new Triggerable({
+        action: config.action,
+        collider: poly,
+        counter: 0,
+        isEnabled: true,
+        position: new Vector(config.x, config.y + 1),
+        isSolid: true,
+        timeout: config.timeout,
+    });
+    const renderable = Renderable.polygon({
+        backgroundColor: colorSkillFill,
+        layer: 110,
+        shape: poly,
+    });
+    const solid = new Solid({
+        isCollisionEnabled: true,
+        isFrictionEnabled: false,
+        isGravityEnabled: false,
+        isStatic: true,
+        isVelocityEnabled: false,
+        collider: poly,
+    });
+    const transform = new Transform({
+        position: new Vector(config.x, config.y),
+    });
+    entity.set(Triggerable.name, triggerable);
+    entity.set(Renderable.name, renderable);
+    entity.set(Solid.name, solid);
+    entity.set(Transform.name, transform);
+    return entity;
+}
 const entities = new EntityArray();
 const systems = new SystemArray();
-const player = createPlayer(0, 0);
+const player = createPlayer(0, -144);
 entities.push(player);
-entities.push(createGround(-2000, -1000, 1000, 1000));
-entities.push(createGround(-2000, 0, 4000, 1000));
-entities.push(createGround(2000, -100, 1000, 1000));
-entities.push(createGround(3200, -100, 3000, 1000));
-entities.push(createGround(6700, -100, 3000, 1000));
+entities.push(createGround(-2000, -1000, 1360, 1000));
+entities.push(createGround(-2000, 0, 3280, 1000));
+entities.push(createGround(1280, -100, 2560, 1000));
+entities.push(createGround(3740, 100, 700, 1000));
+entities.push(createGround(4340, -100, 1920, 1000));
+entities.push(createGround(6760, -100, 13240, 1000));
+entities.push(createGround(8000, -2000, 6000, 1000));
+entities.push(createGround(10600, -1000, 100, 100));
+entities.push(createGround(10800, -1000, 100, 250));
+entities.push(createGround(16000, -1000, 1280, 900));
+entities.push(createBuilding(entities, -216, -600, 200, 600));
+entities.push(createBuilding(entities, 15000, -700, 200, 600));
 for (let i = 0; i < 50; i++) {
-    entities.push(createCloud(-2000, 9700, -500, -300));
+    entities.push(createCloud(-2000, 16500, -800, -300));
 }
 for (let i = 0; i < 300; i++) {
-    entities.push(createStar(-2000, 9700, -800, 0));
+    entities.push(createStar(-2000, 16500, -1200, 0));
 }
-entities.push(createMessage("Welcome to the interactive application!\n\nTo walk left and right\nuse the arrow keys left and right,\nor use the A and D keys.", 0, -400, "center"));
-entities.push(createMessage("Use the space bar to jump.", 2000, -400, "center"));
-entities.push(createMessage("Hold the shift key to run.", 3100, -400, "center"));
+entities.push(createMessage({
+    content: "Welcome to the interactive application!_In this short game you play as me, the little code wizard. You will have to guide the little code wizard through his journey to his new colleagues._Please pay special attention to the message boxes throughout the game._To walk left and right use the arrow keys left and right, or use the A and D keys respectively.",
+    x: 0,
+    y: -500,
+    alignment: "center",
+    backgroundColor: colorMessageFill,
+    borderColor: colorMessageStroke,
+    autobreak: 48,
+}));
+entities.push(createMessage({
+    content: "Use the space bar to jump.",
+    x: 1280,
+    y: -400,
+    alignment: "center",
+    backgroundColor: colorMessageFill,
+    borderColor: colorMessageStroke,
+    autobreak: 48,
+}));
+entities.push(createMessage({
+    content: "Hold the shift key to run.",
+    x: 2560,
+    y: -400,
+    alignment: "center",
+    backgroundColor: colorMessageFill,
+    borderColor: colorMessageStroke,
+    autobreak: 48,
+}));
 entities.push(createTrigger({
-    x: 3000,
-    y: 300,
+    x: 3500,
+    y: -1000,
     w: 200,
-    h: 200,
+    h: 1000,
     action: (self, activator, entities) => {
         const triggerable = self.get(Triggerable.name);
         if (triggerable.counter === 0) {
-            const transform = activator.get(Transform.name);
-            transform.position.x = 2900;
-            transform.position.y = -132;
-            const message = createMessage("Test", transform.position.x, transform.position.y - 100, "center");
+            const skillUpFill = createSkillUp({
+                amount: 1,
+                x: 3500,
+                y: -300,
+                backgroundColor: colorSkillFill,
+            });
+            const skillUpEmpty = createAntiSkillUp({
+                amount: 5,
+                x: 3500,
+                y: -300,
+                backgroundColor: colorMessageFill,
+            });
+            const message = createSkillMessage({
+                content: "Soft Skill: Communication!_The little code wizard successfully communicated the game's controls to you.",
+                x: 3500,
+                y: -456,
+                alignment: "center",
+                backgroundColor: colorMessageFill,
+                borderColor: colorSkillFill,
+            });
+            entities.push(skillUpFill);
+            entities.push(skillUpEmpty);
+            entities.push(message);
+        }
+    },
+}));
+entities.push(createTrigger({
+    x: 3840,
+    y: -150,
+    w: 500,
+    h: 250,
+    action: (self, activator, entities) => {
+        const triggerable = self.get(Triggerable.name);
+        if (triggerable.counter === 0) {
+            const message = createMessage({
+                content: "Looks like that gap was too far for the little code wizard._Fortunately his potential new colleagues are supportive even when he makes a mistake, so he is not afraid of making one._Encourage the little code wizard to try again by jumping out!",
+                x: 4090,
+                y: -400,
+                alignment: "center",
+                backgroundColor: colorMessageFill,
+                borderColor: colorMessageStroke,
+                autobreak: 48,
+            });
             entities.push(message);
             triggerable.relatedEntities.push(message);
         }
         else if (triggerable.counter === 1) {
-            const entity = triggerable.relatedEntities.all([Message])[0];
-            const message = entity.get(Message.name);
-            const messageTransform = entity.get(Transform.name);
-            const transform = activator.get(Transform.name);
-            transform.position.x = 2900;
-            transform.position.y = -132;
-            message.content = "You can do it!";
-            messageTransform.scale.x = message.width;
-            messageTransform.scale.y = message.height;
+            const message = triggerable.relatedEntities[0];
+            const renderable = message.get(Renderable.name);
+            renderable.isRendered = true;
         }
-        else {
-            const t = entities.all([Player])[0].get(Transform.name);
-            t.position.x = 2900;
-            t.position.y = -132;
+    },
+    actionOnLeave: (self, activator, entities) => {
+        const triggerable = self.get(Triggerable.name);
+        const message = triggerable.relatedEntities[0];
+        const renderable = message.get(Renderable.name);
+        if (!renderable) {
+            return;
+        }
+        renderable.isRendered = false;
+        triggerable.counter = 1;
+    },
+}));
+entities.push(createTrigger({
+    x: 4600,
+    y: -1000,
+    w: 200,
+    h: 1000,
+    action: (self, activator, entities) => {
+        const triggerable = self.get(Triggerable.name);
+        if (triggerable.counter === 0) {
+            const skillUpFill = createSkillUp({
+                amount: 2,
+                x: 4600,
+                y: -300,
+                backgroundColor: colorSkillFill,
+            });
+            const skillUpEmpty = createAntiSkillUp({
+                amount: 5,
+                x: 4600,
+                y: -300,
+                backgroundColor: colorMessageFill,
+            });
+            const message = createSkillMessage({
+                content: "Soft Skill: Courage!_The little code wizard showed his courage by not giving up even after failure.",
+                x: 4600,
+                y: -456,
+                alignment: "center",
+                backgroundColor: colorMessageFill,
+                borderColor: colorSkillFill,
+            });
+            entities.push(skillUpFill);
+            entities.push(skillUpEmpty);
+            entities.push(message);
+        }
+    },
+}));
+entities.push(createTrigger({
+    x: 6060,
+    y: -1000,
+    w: 360,
+    h: 1000,
+    action: (self, activator, entities) => {
+        const triggerable = self.get(Triggerable.name);
+        if (triggerable.counter === 0) {
+            entities.push(createMessage({
+                content: "This time the little code wizard is on his own without the help from his senior code wizards._He studied extra hard since the last time he made this mistake and has since learned how to deal with this problem._Let the little code wizard display his magic by pressing either Enter or E.",
+                x: 5950,
+                y: -500,
+                alignment: "center",
+                backgroundColor: colorMessageFill,
+                borderColor: colorMessageStroke,
+                autobreak: 32,
+            }));
+            entities.push(createTrigger({
+                x: 6060,
+                y: -1000,
+                w: 360,
+                h: 1000,
+                isButtonEnabled: true,
+                action: (self, activator, entities) => {
+                    const triggerable = self.get(Triggerable.name);
+                    if (triggerable.counter === 0) {
+                        entities.push(createGround(6240, -100, 540, 64));
+                        entities.push(createMessage({
+                            content: "const bridge: Bridge = new Bridge()\n    .length(500)\n    .width(64)\n    .build();",
+                            alignment: "left",
+                            x: 6250,
+                            y: -400,
+                            backgroundColor: colorMessageFill,
+                            borderColor: colorCodeStroke,
+                            autobreak: 0,
+                        }));
+                    }
+                },
+            }));
+        }
+    },
+}));
+entities.push(createTrigger({
+    x: 6260,
+    y: 100,
+    w: 500,
+    h: 200,
+    action: (self, activator, entities) => {
+        const transform = activator.get(Transform.name);
+        transform.position.x = 6060;
+        transform.position.y = -144;
+    },
+}));
+entities.push(createTrigger({
+    x: 7000,
+    y: -1000,
+    w: 100,
+    h: 1000,
+    action: (self, activator, entities) => {
+        const triggerable = self.get(Triggerable.name);
+        if (triggerable.counter === 0) {
+            const skillUpFill = createSkillUp({
+                amount: 3,
+                x: 7000,
+                y: -300,
+                backgroundColor: colorSkillFill,
+            });
+            const skillUpEmpty = createAntiSkillUp({
+                amount: 5,
+                x: 7000,
+                y: -300,
+                backgroundColor: colorMessageFill,
+            });
+            const message = createSkillMessage({
+                content: "Soft Skill: Inquisitiveness!_Through his natural curiousity and his eagerness to learn, the little code wizard was able to bridge the gap.",
+                x: 7000,
+                y: -476,
+                alignment: "center",
+                backgroundColor: colorMessageFill,
+                borderColor: colorSkillFill,
+            });
+            entities.push(skillUpFill);
+            entities.push(skillUpEmpty);
+            entities.push(message);
+        }
+    },
+}));
+entities.push(createTrigger({
+    x: 9000,
+    y: -450,
+    w: 400,
+    h: 450,
+    action: (self, activator, entities) => {
+        const solid = activator.get(Solid.name);
+        const player = activator.get(Player.name);
+        solid.gravity.linear.y = -2;
+        player.isGravityReversed = true;
+    },
+}));
+entities.push(createTrigger({
+    x: 11500,
+    y: -1000,
+    w: 500,
+    h: 350,
+    timeout: 1000,
+    action: (self, activator, entities) => {
+        const solid = activator.get(Solid.name);
+        const player = activator.get(Player.name);
+        solid.gravity.linear.y = 2;
+        player.isGravityReversed = false;
+    },
+}));
+entities.push(createTrigger({
+    x: 13000,
+    y: -400,
+    w: 500,
+    h: 350,
+    timeout: 1000,
+    action: (self, activator, entities) => {
+        const triggerable = self.get(Triggerable.name);
+        if (triggerable.counter === 0) {
+            const skillUpFill = createSkillUp({
+                amount: 4,
+                x: 13000,
+                y: -300,
+                backgroundColor: colorSkillFill,
+            });
+            const skillUpEmpty = createAntiSkillUp({
+                amount: 5,
+                x: 13000,
+                y: -300,
+                backgroundColor: colorMessageFill,
+            });
+            const message = createSkillMessage({
+                content: "Soft Skill: Adaptability!_Even though the code wizard was surprised by the sudden change he was able to adapt himself to the new challenge and proceeds onwards.",
+                x: 13000,
+                y: -496,
+                alignment: "center",
+                backgroundColor: colorMessageFill,
+                borderColor: colorSkillFill,
+            });
+            entities.push(skillUpFill);
+            entities.push(skillUpEmpty);
+            entities.push(message);
+        }
+    },
+}));
+entities.push(createTrigger({
+    x: 15100,
+    y: -400,
+    w: 500,
+    h: 350,
+    timeout: 1000,
+    action: (self, activator, entities) => {
+        const triggerable = self.get(Triggerable.name);
+        if (triggerable.counter === 0) {
+            const skillUpFill = createSkillUp({
+                amount: 5,
+                x: 15100,
+                y: -300,
+                backgroundColor: colorSkillFill,
+            });
+            const message = createSkillMessage({
+                content: "Soft Skill: Teamwork!_Looks like the little code wizard has finished his journey to meet his new colleagues. Thank you for working together with the little code wizard to find the starting line for his new journey.",
+                x: 15100,
+                y: -556,
+                alignment: "center",
+                backgroundColor: colorMessageFill,
+                borderColor: colorSkillFill,
+            });
+            entities.push(skillUpFill);
+            entities.push(message);
         }
     },
 }));
@@ -1782,4 +2633,6 @@ systems.push(new Trigger());
 const app = new App({
     entities: entities,
     systems: systems,
+    width: 1280,
+    height: 720,
 });

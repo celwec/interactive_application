@@ -9,6 +9,7 @@ class Player {
 	public jumpEndY: number;
 	public jumpHeight: number;
 	public isCasting: boolean;
+	public isGravityReversed: boolean;
 
 	constructor() {
 		this.walkSpeed = 1;
@@ -21,6 +22,7 @@ class Player {
 		this.jumpEndY = 0;
 		this.jumpHeight = 200;
 		this.isCasting = false;
+		this.isGravityReversed = false;
 	}
 
 	public get jumpFinished(): boolean {

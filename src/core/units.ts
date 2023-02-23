@@ -18,7 +18,7 @@ abstract class Matrix {
 		const b20: number = b[2 * 3 + 0];
 		const b21: number = b[2 * 3 + 1];
 		const b22: number = b[2 * 3 + 2];
-	 
+
 		return new Float32Array([
 			b00 * a00 + b01 * a10 + b02 * a20,
 			b00 * a01 + b01 * a11 + b02 * a21,
@@ -32,44 +32,28 @@ abstract class Matrix {
 		]);
 	}
 
-	static project(m: Float32Array, w: number, h: number): Float32Array {
-		return new Float32Array([
-			2/w, 0, 0,
-			0, -2/h, 0,
-			-1, 1, 1,
-		]);
+	static project(w: number, h: number): Float32Array {
+		return new Float32Array([2 / w, 0, 0, 0, -2 / h, 0, -1, 1, 1]);
 	}
 
 	static translate(m: Float32Array, x: number, y: number): Float32Array {
 		return Matrix.multiply(m, Matrix.translation(x, y));
 	}
 
-	static scale(m: Float32Array, x: number, y:number): Float32Array {
+	static scale(m: Float32Array, x: number, y: number): Float32Array {
 		return Matrix.multiply(m, Matrix.scaling(x, y));
 	}
 
 	private static identity(): Float32Array {
-		return new Float32Array([
-			1, 0, 0,
-			0, 1, 0,
-			0, 0, 1,
-		]);
+		return new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
 	}
 
 	private static translation(x: number, y: number): Float32Array {
-		return new Float32Array([
-			1, 0, 0,
-			0, 1, 0,
-			x, y, 1,
-		]);
+		return new Float32Array([1, 0, 0, 0, 1, 0, x, y, 1]);
 	}
 
 	private static scaling(x: number, y: number): Float32Array {
-		return new Float32Array([
-			x, 0, 0,
-			0, y, 0,
-			0, 0, 1,
-		]);
+		return new Float32Array([x, 0, 0, 0, y, 0, 0, 0, 1]);
 	}
 }
 
@@ -175,13 +159,43 @@ class Force {
 	public rotational: Vector;
 	public scalar: Vector;
 
-	constructor(settings?: {
-		linear?: Vector,
-		rotational?: Vector,
-		scalar?: Vector,
-	}) {
+	constructor(settings?: { linear?: Vector; rotational?: Vector; scalar?: Vector }) {
 		this.linear = settings?.linear || new Vector();
 		this.rotational = settings?.rotational || new Vector();
 		this.scalar = settings?.scalar || new Vector(1, 1);
+	}
+}
+
+class Frame {
+	public delayMs: number;
+	public height: number;
+	public texture: TexImageSource;
+	public width: number;
+	public xOffset: number;
+	public yOffset: number;
+
+	constructor(url: string, xOffset: number, yOffset: number, width: number, height: number, delayMs: number) {
+		this.delayMs = delayMs;
+		this.height = height;
+		this.width = width;
+		this.xOffset = xOffset;
+		this.yOffset = yOffset;
+
+		const off: OffscreenCanvas = new OffscreenCanvas(width, height);
+		const ctx: OffscreenCanvasRenderingContext2D = <OffscreenCanvasRenderingContext2D>off.getContext("2d");
+
+		const image: HTMLImageElement = new Image();
+		image.src = url;
+		const sx: number = xOffset;
+		const sy: number = yOffset;
+		const sw: number = width;
+		const sh: number = height;
+		const dx: number = 0;
+		const dy: number = 0;
+		const dw: number = width;
+		const dh: number = height;
+
+		ctx.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
+		this.texture = off.transferToImageBitmap();
 	}
 }

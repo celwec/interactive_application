@@ -5,10 +5,10 @@ class Entity extends Map {
 		for (let i = 0; i < componentTypes.length; i++) {
 			const componentType = componentTypes[i];
 			const foundComponent = this.get(componentType.name);
-	
+
 			if (foundComponent) {
 				foundComponents.set(foundComponent.constructor.name, foundComponent);
-			}	
+			}
 		}
 
 		if (foundComponents.size === componentTypes.length) {
@@ -26,7 +26,7 @@ class Entity extends Map {
 
 			if (this.has(component.name)) {
 				hasMatchingComponents = true;
-			}			
+			}
 		}
 
 		if (hasMatchingComponents) {
@@ -44,7 +44,7 @@ class EntityArray extends Array {
 		if (!entities) {
 			return;
 		}
-		
+
 		this.push(entities);
 	}
 
@@ -67,7 +67,7 @@ class EntityArray extends Array {
 
 		for (let i = 0; i < this.length; i++) {
 			const entity = this[i];
-			
+
 			if (entity.any(components)) {
 				filtered.push(entity);
 			}

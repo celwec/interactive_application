@@ -22,7 +22,6 @@ const fragmentShaderCode: string = `
 
 	void main() {
 		gl_FragColor = u_color * texture2D(u_texture, v_texcoord);
-		// gl_FragColor = u_color;
 	}
 `;
 
@@ -47,7 +46,11 @@ function createShader(gl: WebGL2RenderingContext, type: number, source: string):
 	return shader;
 }
 
-function createProgram(gl: WebGL2RenderingContext, vertexShader: WebGLShader, fragmentShader: WebGLShader): WebGLProgram | null {
+function createProgram(
+	gl: WebGL2RenderingContext,
+	vertexShader: WebGLShader,
+	fragmentShader: WebGLShader
+): WebGLProgram | null {
 	const program: WebGLProgram | null = gl.createProgram();
 
 	if (!program) {
@@ -66,6 +69,6 @@ function createProgram(gl: WebGL2RenderingContext, vertexShader: WebGLShader, fr
 		gl.deleteProgram(program);
 		return null;
 	}
-	
+
 	return program;
 }
