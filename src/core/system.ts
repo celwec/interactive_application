@@ -1,5 +1,6 @@
 interface System {
-	update(entities: EntityArray): void;
+	// update(entities: EntityArray): void;
+	update(archetypes: ArchetypeMap): void;
 }
 
 class SystemArray extends Array {

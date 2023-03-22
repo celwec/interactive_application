@@ -1,6 +1,6 @@
 class Physics implements System {
-	update(entities: EntityArray): void {
-		const filtered: EntityArray = entities.all([Solid]);
+	update(archetypes: ArchetypeMap): void {
+		const filtered: Entity[] = archetypes.pull([Solid.name]);
 
 		if (filtered.length < 1) {
 			return;

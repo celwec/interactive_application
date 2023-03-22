@@ -1,19 +1,23 @@
 class ArchetypeMap extends Map<string, Entity[]> {
-	public add(entity: Entity): void {
-		const components: string[] = Array.from(entity.keys());
-		const permutations: string[] = this._windows(components);
+	public add(entity: Entity) {
+		const archetypes: string[] = this._getArchetypesFrom(entity);
 
-		for (let i = 0; i < permutations.length; i++) {
-			const permutation: string = permutations[i];
-			const hash: string = this._hashStr(permutation);
+		for (let i = 0; i < archetypes.length; i++) {
+			const archetype = archetypes[i];
+			const hash: string = this._hashStr(archetype);
+			const hasArchetype: boolean = this.has(hash);
 
-			if (!this.has(hash)) {
+			if (hasArchetype) {
+				const entities: Entity[] = this.get(hash)!;
+
+				if (entities.includes(entity)) {
+					continue;
+				}
+
+				entities.push(entity);
+			} else {
 				this.set(hash, [entity]);
-				return;
 			}
-
-			const entities: Entity[] = this.get(hash)!;
-			entities.push(entity);
 		}
 	}
 
@@ -39,50 +43,26 @@ class ArchetypeMap extends Map<string, Entity[]> {
 		return hash;
 	}
 
-	private _permutations(strings: string[]): string[] {
+	private _getArchetypesFrom(entity: Entity): string[] {
+		const components: string[] = Array.from(entity.values()).map((v) => v.constructor.name);
+		return this._getPermutations(components).slice(1);
+	}
+
+	private _getPermutations(components: string[]): string[] {
 		const permutations: string[] = [];
 
-		for (let i = 0; i < strings.length; i++) {
-			for (let j = i; j < strings.length; j++) {
-				const slice: string[] = strings.slice(i, j + 1);
-				const variations: string[] = this._variations(slice);
+		function generatePermutations(currentString: string, remainingComponents: string[]): void {
+			permutations.push(currentString);
 
-				for (let k = 0; k < variations.length; k++) {
-					const variation: string = variations[k];
-					permutations.push(variation);
-				}
+			for (let i = 0; i < remainingComponents.length; i++) {
+				generatePermutations(
+					currentString + remainingComponents[i],
+					remainingComponents.slice(0, i).concat(remainingComponents.slice(i + 1))
+				);
 			}
 		}
 
-		return permutations;
-	}
-
-	private _variations(strings: string[]): string[] {
-		let variations: string[] = [];
-
-		for (let i = 0; i < strings.length; i++) {
-			variations = variations.concat(strings.join(""));
-			const shifted: string = strings.shift()!;
-			strings.push(shifted);
-		}
-
-		return variations;
-	}
-
-	private _windows(strings: string[]): string[] {
-		const permutations: string[] = [];
-
-		for (let size = 1; size < strings.length; size++) {
-			for (let index = 0; index < strings.length; index++) {
-				const window: string[] = strings.slice(index, (index + size) % strings.length);
-				const variations: string[] = this._variations(window);
-
-				for (let k = 0; k < variations.length; k++) {
-					const variation: string = variations[k];
-					permutations.push(variation);
-				}
-			}
-		}
+		generatePermutations("", components);
 
 		return permutations;
 	}

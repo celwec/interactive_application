@@ -34,49 +34,37 @@
 
 const entities: EntityArray = new EntityArray();
 const systems: SystemArray = new SystemArray();
+const archetypes: ArchetypeMap = new ArchetypeMap();
 
-// const entity: Entity = new Entity();
-// const transform: Transform = new Transform();
-// const player: Player = new Player();
-// const solid: Solid = new Solid();
-// entity.set(Transform.name, transform);
-// entity.set(Player.name, player);
-// entity.set(Solid.name, solid);
-// entities.push(entity);
+archetypes.add(createPlayer(0, -44));
 
-// const player: Entity = createPlayer(4440, -144);
-// const player: Entity = createPlayer(6144, -144);
-const player: Entity = createPlayer(0, -144);
-
-entities.push(player);
-
-entities.push(createGround(-2000, -1000, 1360, 1000));
-entities.push(createGround(-2000, 0, 3280, 1000));
-entities.push(createGround(1280, -100, 2560, 1000));
+archetypes.add(createGround(-2000, -1000, 1360, 1000));
+archetypes.add(createGround(-2000, 0, 3280, 1000));
+archetypes.add(createGround(1280, -100, 2560, 1000));
 // Training gap here
-entities.push(createGround(3740, 100, 700, 1000));
-entities.push(createGround(4340, -100, 1920, 1000));
+archetypes.add(createGround(3740, 100, 700, 1000));
+archetypes.add(createGround(4340, -100, 1920, 1000));
 // Bridge gap here
-entities.push(createGround(6760, -100, 13240, 1000));
+archetypes.add(createGround(6760, -100, 13240, 1000));
 // Reversed
-entities.push(createGround(8000, -2000, 6000, 1000));
-entities.push(createGround(10600, -1000, 100, 100));
-entities.push(createGround(10800, -1000, 100, 250));
+archetypes.add(createGround(8000, -2000, 6000, 1000));
+archetypes.add(createGround(10600, -1000, 100, 100));
+archetypes.add(createGround(10800, -1000, 100, 250));
 // End Wall
-entities.push(createGround(16000, -1000, 1280, 900));
+archetypes.add(createGround(16000, -1000, 1280, 900));
 
-entities.push(createBuilding(entities, -216, -600, 200, 600));
-entities.push(createBuilding(entities, 15000, -700, 200, 600));
+archetypes.add(createBuilding(entities, -216, -600, 200, 600));
+archetypes.add(createBuilding(entities, 15000, -700, 200, 600));
 
 for (let i = 0; i < 50; i++) {
-	entities.push(createCloud(-2000, 16500, -800, -300));
+	archetypes.add(createCloud(-2000, 16500, -800, -300));
 }
 
 for (let i = 0; i < 300; i++) {
-	entities.push(createStar(-2000, 16500, -1200, 0));
+	archetypes.add(createStar(-2000, 16500, -1200, 0));
 }
 
-entities.push(
+archetypes.add(
 	createMessage({
 		content:
 			"Welcome to the interactive application!_In this short game you play as me, the little code wizard. You will have to guide the little code wizard through his journey to his new colleagues._Please pay special attention to the message boxes throughout the game._To walk left and right use the arrow keys left and right, or use the A and D keys respectively.",
@@ -88,7 +76,7 @@ entities.push(
 		autobreak: 48,
 	})
 );
-entities.push(
+archetypes.add(
 	createMessage({
 		content: "Use the space bar to jump.",
 		x: 1280,
@@ -99,7 +87,7 @@ entities.push(
 		autobreak: 48,
 	})
 );
-entities.push(
+archetypes.add(
 	createMessage({
 		content: "Hold the shift key to run.",
 		x: 2560,
@@ -111,7 +99,7 @@ entities.push(
 	})
 );
 
-entities.push(
+archetypes.add(
 	createTrigger({
 		x: 3500,
 		y: -1000,
@@ -145,15 +133,15 @@ entities.push(
 					borderColor: colorSkillFill,
 				});
 
-				entities.push(skillUpFill);
-				entities.push(skillUpEmpty);
-				entities.push(message);
+				archetypes.add(skillUpFill);
+				archetypes.add(skillUpEmpty);
+				archetypes.add(message);
 			}
 		},
 	})
 );
 
-entities.push(
+archetypes.add(
 	createTrigger({
 		x: 3840,
 		y: -150,
@@ -174,7 +162,7 @@ entities.push(
 					autobreak: 48,
 				});
 
-				entities.push(message);
+				archetypes.add(message);
 				triggerable.relatedEntities.push(message);
 			} else if (triggerable.counter === 1) {
 				const message: Entity = triggerable.relatedEntities[0];
@@ -197,7 +185,7 @@ entities.push(
 	})
 );
 
-entities.push(
+archetypes.add(
 	createTrigger({
 		x: 4600,
 		y: -1000,
@@ -231,15 +219,15 @@ entities.push(
 					borderColor: colorSkillFill,
 				});
 
-				entities.push(skillUpFill);
-				entities.push(skillUpEmpty);
-				entities.push(message);
+				archetypes.add(skillUpFill);
+				archetypes.add(skillUpEmpty);
+				archetypes.add(message);
 			}
 		},
 	})
 );
 
-entities.push(
+archetypes.add(
 	createTrigger({
 		x: 6060,
 		y: -1000,
@@ -249,7 +237,7 @@ entities.push(
 			const triggerable: Triggerable = self.get(Triggerable.name);
 
 			if (triggerable.counter === 0) {
-				entities.push(
+				archetypes.add(
 					createMessage({
 						content:
 							"This time the little code wizard is on his own without the help from his senior code wizards._He studied extra hard since the last time he made this mistake and has since learned how to deal with this problem._Let the little code wizard display his magic by pressing either Enter or E.",
@@ -262,7 +250,7 @@ entities.push(
 					})
 				);
 
-				entities.push(
+				archetypes.add(
 					createTrigger({
 						x: 6060,
 						y: -1000,
@@ -273,8 +261,8 @@ entities.push(
 							const triggerable: Triggerable = self.get(Triggerable.name);
 
 							if (triggerable.counter === 0) {
-								entities.push(createGround(6240, -100, 540, 64));
-								entities.push(
+								archetypes.add(createGround(6240, -100, 540, 64));
+								archetypes.add(
 									createMessage({
 										content:
 											"const bridge: Bridge = new Bridge()\n    .length(500)\n    .width(64)\n    .build();",
@@ -295,7 +283,7 @@ entities.push(
 	})
 );
 
-entities.push(
+archetypes.add(
 	createTrigger({
 		x: 6260,
 		y: 100,
@@ -310,7 +298,7 @@ entities.push(
 	})
 );
 
-entities.push(
+archetypes.add(
 	createTrigger({
 		x: 7000,
 		y: -1000,
@@ -344,31 +332,37 @@ entities.push(
 					borderColor: colorSkillFill,
 				});
 
-				entities.push(skillUpFill);
-				entities.push(skillUpEmpty);
-				entities.push(message);
+				archetypes.add(skillUpFill);
+				archetypes.add(skillUpEmpty);
+				archetypes.add(message);
 			}
 		},
 	})
 );
 
-entities.push(
+archetypes.add(
 	createTrigger({
 		x: 9000,
 		y: -450,
 		w: 400,
 		h: 450,
 		action: (self: Entity, activator: Entity, entities: EntityArray) => {
-			const solid: Solid = activator.get(Solid.name);
-			const player: Player = activator.get(Player.name);
+			const triggerable: Triggerable = self.get(Triggerable.name);
 
-			solid.gravity.linear.y = -2;
-			player.isGravityReversed = true;
+			if (triggerable.counter === 0) {
+				const transform: Transform = activator.get(Transform.name);
+				const solid: Solid = activator.get(Solid.name);
+				const player: Player = activator.get(Player.name);
+
+				transform.scale.y = -48;
+				solid.gravity.linear.y = -2;
+				player.isGravityReversed = true;
+			}
 		},
 	})
 );
 
-entities.push(
+archetypes.add(
 	createTrigger({
 		x: 11500,
 		y: -1000,
@@ -376,16 +370,22 @@ entities.push(
 		h: 350,
 		timeout: 1000,
 		action: (self: Entity, activator: Entity, entities: EntityArray) => {
-			const solid: Solid = activator.get(Solid.name);
-			const player: Player = activator.get(Player.name);
+			const triggerable: Triggerable = self.get(Triggerable.name);
 
-			solid.gravity.linear.y = 2;
-			player.isGravityReversed = false;
+			if (triggerable.counter === 0) {
+				const transform: Transform = activator.get(Transform.name);
+				const solid: Solid = activator.get(Solid.name);
+				const player: Player = activator.get(Player.name);
+
+				transform.scale.y *= -1;
+				solid.gravity.linear.y = 2;
+				player.isGravityReversed = false;
+			}
 		},
 	})
 );
 
-entities.push(
+archetypes.add(
 	createTrigger({
 		x: 13000,
 		y: -400,
@@ -420,15 +420,15 @@ entities.push(
 					borderColor: colorSkillFill,
 				});
 
-				entities.push(skillUpFill);
-				entities.push(skillUpEmpty);
-				entities.push(message);
+				archetypes.add(skillUpFill);
+				archetypes.add(skillUpEmpty);
+				archetypes.add(message);
 			}
 		},
 	})
 );
 
-entities.push(
+archetypes.add(
 	createTrigger({
 		x: 15100,
 		y: -400,
@@ -456,8 +456,8 @@ entities.push(
 					borderColor: colorSkillFill,
 				});
 
-				entities.push(skillUpFill);
-				entities.push(message);
+				archetypes.add(skillUpFill);
+				archetypes.add(message);
 			}
 		},
 	})
@@ -469,8 +469,8 @@ systems.push(new Scrolling());
 systems.push(new Trigger());
 
 const app: App = new App({
-	entities: entities,
 	systems: systems,
+	archetypes: archetypes,
 	width: 1280,
 	height: 720,
 });

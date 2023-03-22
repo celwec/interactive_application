@@ -257,6 +257,8 @@ class Renderable {
 
 		const frame: Frame = animation[this.frameIndex];
 
+		this.width = frame.width;
+		this.height = frame.height;
 		this.texture = frame.texture;
 		// this.frameIndex = (this.frameIndex + 1) % animation.length;
 	}

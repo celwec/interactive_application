@@ -97,17 +97,21 @@ class ComponentMap extends Map {
 }
 class ArchetypeMap extends Map {
     add(entity) {
-        const components = Array.from(entity.keys());
-        const permutations = this._windows(components);
-        for (let i = 0; i < permutations.length; i++) {
-            const permutation = permutations[i];
-            const hash = this._hashStr(permutation);
-            if (!this.has(hash)) {
-                this.set(hash, [entity]);
-                return;
+        const archetypes = this._getArchetypesFrom(entity);
+        for (let i = 0; i < archetypes.length; i++) {
+            const archetype = archetypes[i];
+            const hash = this._hashStr(archetype);
+            const hasArchetype = this.has(hash);
+            if (hasArchetype) {
+                const entities = this.get(hash);
+                if (entities.includes(entity)) {
+                    continue;
+                }
+                entities.push(entity);
             }
-            const entities = this.get(hash);
-            entities.push(entity);
+            else {
+                this.set(hash, [entity]);
+            }
         }
     }
     pull(components) {
@@ -126,41 +130,19 @@ class ArchetypeMap extends Map {
         const hash = string.toLowerCase().split("").sort().join("");
         return hash;
     }
-    _permutations(strings) {
+    _getArchetypesFrom(entity) {
+        const components = Array.from(entity.values()).map((v) => v.constructor.name);
+        return this._getPermutations(components).slice(1);
+    }
+    _getPermutations(components) {
         const permutations = [];
-        for (let i = 0; i < strings.length; i++) {
-            for (let j = i; j < strings.length; j++) {
-                const slice = strings.slice(i, j + 1);
-                const variations = this._variations(slice);
-                for (let k = 0; k < variations.length; k++) {
-                    const variation = variations[k];
-                    permutations.push(variation);
-                }
+        function generatePermutations(currentString, remainingComponents) {
+            permutations.push(currentString);
+            for (let i = 0; i < remainingComponents.length; i++) {
+                generatePermutations(currentString + remainingComponents[i], remainingComponents.slice(0, i).concat(remainingComponents.slice(i + 1)));
             }
         }
-        return permutations;
-    }
-    _variations(strings) {
-        let variations = [];
-        for (let i = 0; i < strings.length; i++) {
-            variations = variations.concat(strings.join(""));
-            const shifted = strings.shift();
-            strings.push(shifted);
-        }
-        return variations;
-    }
-    _windows(strings) {
-        const permutations = [];
-        for (let size = 1; size < strings.length; size++) {
-            for (let index = 0; index < strings.length; index++) {
-                const window = strings.slice(index, (index + size) % strings.length);
-                const variations = this._variations(window);
-                for (let k = 0; k < variations.length; k++) {
-                    const variation = variations[k];
-                    permutations.push(variation);
-                }
-            }
-        }
+        generatePermutations("", components);
         return permutations;
     }
 }
@@ -327,20 +309,17 @@ class Frame {
         this.width = width;
         this.xOffset = xOffset;
         this.yOffset = yOffset;
-        const off = new OffscreenCanvas(width, height);
-        const ctx = off.getContext("2d");
         const image = new Image();
         image.src = url;
         const sx = xOffset;
         const sy = yOffset;
         const sw = width;
         const sh = height;
-        const dx = 0;
-        const dy = 0;
-        const dw = width;
-        const dh = height;
-        ctx.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
-        this.texture = off.transferToImageBitmap();
+        image.onload = () => createImageBitmap(image, sx, sy, sw, sh, {
+            resizeQuality: "pixelated",
+        }).then((sprite) => {
+            this.texture = sprite;
+        });
     }
 }
 function lerp(a, b, t) {
@@ -858,6 +837,8 @@ class Renderable {
             return;
         }
         const frame = animation[this.frameIndex];
+        this.width = frame.width;
+        this.height = frame.height;
         this.texture = frame.texture;
     }
     _createTexture() {
@@ -1051,8 +1032,8 @@ class Triggerable {
     }
 }
 class Movement {
-    update(entities) {
-        const filtered = entities.all([Transform, Solid]);
+    update(archetypes) {
+        const filtered = archetypes.pull([Transform.name, Solid.name]);
         for (let i = 0; i < filtered.length; i++) {
             const entity = filtered[i];
             const solid = entity.get(Solid.name);
@@ -1069,8 +1050,8 @@ class Movement {
     }
 }
 class Physics {
-    update(entities) {
-        const filtered = entities.all([Solid]);
+    update(archetypes) {
+        const filtered = archetypes.pull([Solid.name]);
         if (filtered.length < 1) {
             return;
         }
@@ -1318,8 +1299,8 @@ class Physics {
     }
 }
 class Scrolling {
-    update(entities) {
-        const filtered = entities.all([Transform, Scrollable]);
+    update(archetypes) {
+        const filtered = archetypes.pull([Transform.name, Scrollable.name]);
         for (let i = 0; i < filtered.length; i++) {
             const entity = filtered[i];
             const transform = entity.get(Transform.name);
@@ -1340,12 +1321,12 @@ class Scrolling {
     }
 }
 class Trigger {
-    update(entities) {
-        const playerEntity = entities.all([Player])[0];
+    update(archetypes) {
+        const playerEntity = archetypes.pull([Player.name])[0];
         const player = playerEntity.get(Player.name);
         const playerTransform = playerEntity.get(Transform.name);
         const playerSolid = playerEntity.get(Solid.name);
-        const filtered = entities.all([Triggerable]);
+        const filtered = archetypes.pull([Triggerable.name]);
         for (let i = 0; i < filtered.length; i++) {
             const entity = filtered[i];
             const triggerable = entity.get(Triggerable.name);
@@ -1367,8 +1348,8 @@ class Trigger {
     }
 }
 class App {
-    _entities;
     _systems;
+    _archetypes;
     _keyStates;
     _currentTime;
     _lastTime;
@@ -1389,9 +1370,10 @@ class App {
     _positionBuffer;
     _canvasRatioWidth;
     _canvasRatioHeight;
+    _playerTransform;
     constructor(settings) {
-        this._entities = settings.entities;
         this._systems = settings.systems;
+        this._archetypes = settings.archetypes;
         this._keyStates = Object;
         this._currentTime = 0;
         this._lastTime = 0;
@@ -1404,6 +1386,8 @@ class App {
         this._canvasHeight = settings.height || 720;
         this._canvasRatioWidth = this._canvasWidth / 1280;
         this._canvasRatioHeight = this._canvasHeight / 720;
+        const player = this._archetypes.pull([Player.name])[0];
+        this._playerTransform = player.get(Transform.name);
         this._loop = this._loop.bind(this);
         this._processInput = this._processInput.bind(this);
         this._keyboardEventHandler = this._keyboardEventHandler.bind(this);
@@ -1475,7 +1459,7 @@ class App {
         requestAnimationFrame(this._loop);
     }
     _processInput() {
-        const filtered = entities.all([Player, Transform, Solid]);
+        const filtered = this._archetypes.pull([Player.name, Transform.name, Solid.name]);
         if (filtered.length !== 1) {
             return;
         }
@@ -1525,19 +1509,16 @@ class App {
     _update() {
         for (let i = 0; i < this._systems.length; i++) {
             const system = this._systems[i];
-            system.update(this._entities);
+            system.update(this._archetypes);
         }
     }
     _render() {
         if (!this._gl) {
             return;
         }
-        const player = this._entities.all([Player])[0];
-        const playerTransform = player.get(Transform.name);
-        if (!playerTransform) {
-            return;
-        }
-        const filtered = this._entities.all([Transform, Renderable]).sort((a, b) => {
+        const filtered = this._archetypes
+            .pull([Transform.name, Renderable.name])
+            .sort((a, b) => {
             const ac = a.get(Renderable.name);
             const bc = b.get(Renderable.name);
             return ac.layer - bc.layer;
@@ -1565,8 +1546,8 @@ class App {
             }
             const transform = entity.get(Transform.name);
             const shape = renderable.shape;
-            const dx = transform.position.x - playerTransform.position.x;
-            const dy = transform.position.y - playerTransform.position.y;
+            const dx = transform.position.x - this._playerTransform.position.x;
+            const dy = transform.position.y - this._playerTransform.position.y;
             let matrix = transform.matrix;
             matrix = Matrix.project(this._canvasWidth, this._canvasHeight);
             matrix = Matrix.translate(matrix, this._canvasWidth / 2 + dx * this._canvasRatioWidth, (this._canvasHeight * 68) / 100 + dy * this._canvasRatioHeight);
@@ -1600,11 +1581,24 @@ class App {
 function createPlayer(x, y) {
     const rect = new Rectangle(1, 1);
     const poly = new Polygon([rect.topLeft, rect.topRight, rect.bottomLeft, rect.bottomRight]);
+    const idle = [
+        new Frame("assets/spritesheets/player.png", 20, 2, 72, 48, 250),
+    ];
+    const animations = new Map();
+    animations.set("idle", idle);
     const entity = new Entity();
     const player = new Player();
+    const renderable = Renderable.sprite({
+        animations: animations,
+        currentAnimation: "idle",
+        frameIndex: 0,
+        layer: 100,
+        shape: poly,
+        url: "assets/spritesheets/player.png",
+    });
     const transform = new Transform({
         position: new Vector(x, y),
-        scale: new Vector(30, 44),
+        scale: new Vector(72, 48),
     });
     const solid = new Solid({
         collider: poly,
@@ -1619,10 +1613,6 @@ function createPlayer(x, y) {
         isStatic: false,
         isVelocityEnabled: true,
         isFrictionEnabled: true,
-    });
-    const renderable = Renderable.polygon({
-        layer: 100,
-        shape: poly,
     });
     entity.set(Player.name, player);
     entity.set(Transform.name, transform);
@@ -1662,7 +1652,7 @@ function createBuilding(entities, x, y, w, h) {
             });
             entity.set(Transform.name, transform);
             entity.set(Renderable.name, renderable);
-            entities.push(entity);
+            archetypes.add(entity);
         }
     }
     const rect = new Rectangle(w, h);
@@ -2299,27 +2289,27 @@ function createBook(config) {
 }
 const entities = new EntityArray();
 const systems = new SystemArray();
-const player = createPlayer(0, -144);
-entities.push(player);
-entities.push(createGround(-2000, -1000, 1360, 1000));
-entities.push(createGround(-2000, 0, 3280, 1000));
-entities.push(createGround(1280, -100, 2560, 1000));
-entities.push(createGround(3740, 100, 700, 1000));
-entities.push(createGround(4340, -100, 1920, 1000));
-entities.push(createGround(6760, -100, 13240, 1000));
-entities.push(createGround(8000, -2000, 6000, 1000));
-entities.push(createGround(10600, -1000, 100, 100));
-entities.push(createGround(10800, -1000, 100, 250));
-entities.push(createGround(16000, -1000, 1280, 900));
-entities.push(createBuilding(entities, -216, -600, 200, 600));
-entities.push(createBuilding(entities, 15000, -700, 200, 600));
+const archetypes = new ArchetypeMap();
+archetypes.add(createPlayer(0, -44));
+archetypes.add(createGround(-2000, -1000, 1360, 1000));
+archetypes.add(createGround(-2000, 0, 3280, 1000));
+archetypes.add(createGround(1280, -100, 2560, 1000));
+archetypes.add(createGround(3740, 100, 700, 1000));
+archetypes.add(createGround(4340, -100, 1920, 1000));
+archetypes.add(createGround(6760, -100, 13240, 1000));
+archetypes.add(createGround(8000, -2000, 6000, 1000));
+archetypes.add(createGround(10600, -1000, 100, 100));
+archetypes.add(createGround(10800, -1000, 100, 250));
+archetypes.add(createGround(16000, -1000, 1280, 900));
+archetypes.add(createBuilding(entities, -216, -600, 200, 600));
+archetypes.add(createBuilding(entities, 15000, -700, 200, 600));
 for (let i = 0; i < 50; i++) {
-    entities.push(createCloud(-2000, 16500, -800, -300));
+    archetypes.add(createCloud(-2000, 16500, -800, -300));
 }
 for (let i = 0; i < 300; i++) {
-    entities.push(createStar(-2000, 16500, -1200, 0));
+    archetypes.add(createStar(-2000, 16500, -1200, 0));
 }
-entities.push(createMessage({
+archetypes.add(createMessage({
     content: "Welcome to the interactive application!_In this short game you play as me, the little code wizard. You will have to guide the little code wizard through his journey to his new colleagues._Please pay special attention to the message boxes throughout the game._To walk left and right use the arrow keys left and right, or use the A and D keys respectively.",
     x: 0,
     y: -500,
@@ -2328,7 +2318,7 @@ entities.push(createMessage({
     borderColor: colorMessageStroke,
     autobreak: 48,
 }));
-entities.push(createMessage({
+archetypes.add(createMessage({
     content: "Use the space bar to jump.",
     x: 1280,
     y: -400,
@@ -2337,7 +2327,7 @@ entities.push(createMessage({
     borderColor: colorMessageStroke,
     autobreak: 48,
 }));
-entities.push(createMessage({
+archetypes.add(createMessage({
     content: "Hold the shift key to run.",
     x: 2560,
     y: -400,
@@ -2346,7 +2336,7 @@ entities.push(createMessage({
     borderColor: colorMessageStroke,
     autobreak: 48,
 }));
-entities.push(createTrigger({
+archetypes.add(createTrigger({
     x: 3500,
     y: -1000,
     w: 200,
@@ -2374,13 +2364,13 @@ entities.push(createTrigger({
                 backgroundColor: colorMessageFill,
                 borderColor: colorSkillFill,
             });
-            entities.push(skillUpFill);
-            entities.push(skillUpEmpty);
-            entities.push(message);
+            archetypes.add(skillUpFill);
+            archetypes.add(skillUpEmpty);
+            archetypes.add(message);
         }
     },
 }));
-entities.push(createTrigger({
+archetypes.add(createTrigger({
     x: 3840,
     y: -150,
     w: 500,
@@ -2397,7 +2387,7 @@ entities.push(createTrigger({
                 borderColor: colorMessageStroke,
                 autobreak: 48,
             });
-            entities.push(message);
+            archetypes.add(message);
             triggerable.relatedEntities.push(message);
         }
         else if (triggerable.counter === 1) {
@@ -2417,7 +2407,7 @@ entities.push(createTrigger({
         triggerable.counter = 1;
     },
 }));
-entities.push(createTrigger({
+archetypes.add(createTrigger({
     x: 4600,
     y: -1000,
     w: 200,
@@ -2445,13 +2435,13 @@ entities.push(createTrigger({
                 backgroundColor: colorMessageFill,
                 borderColor: colorSkillFill,
             });
-            entities.push(skillUpFill);
-            entities.push(skillUpEmpty);
-            entities.push(message);
+            archetypes.add(skillUpFill);
+            archetypes.add(skillUpEmpty);
+            archetypes.add(message);
         }
     },
 }));
-entities.push(createTrigger({
+archetypes.add(createTrigger({
     x: 6060,
     y: -1000,
     w: 360,
@@ -2459,7 +2449,7 @@ entities.push(createTrigger({
     action: (self, activator, entities) => {
         const triggerable = self.get(Triggerable.name);
         if (triggerable.counter === 0) {
-            entities.push(createMessage({
+            archetypes.add(createMessage({
                 content: "This time the little code wizard is on his own without the help from his senior code wizards._He studied extra hard since the last time he made this mistake and has since learned how to deal with this problem._Let the little code wizard display his magic by pressing either Enter or E.",
                 x: 5950,
                 y: -500,
@@ -2468,7 +2458,7 @@ entities.push(createTrigger({
                 borderColor: colorMessageStroke,
                 autobreak: 32,
             }));
-            entities.push(createTrigger({
+            archetypes.add(createTrigger({
                 x: 6060,
                 y: -1000,
                 w: 360,
@@ -2477,8 +2467,8 @@ entities.push(createTrigger({
                 action: (self, activator, entities) => {
                     const triggerable = self.get(Triggerable.name);
                     if (triggerable.counter === 0) {
-                        entities.push(createGround(6240, -100, 540, 64));
-                        entities.push(createMessage({
+                        archetypes.add(createGround(6240, -100, 540, 64));
+                        archetypes.add(createMessage({
                             content: "const bridge: Bridge = new Bridge()\n    .length(500)\n    .width(64)\n    .build();",
                             alignment: "left",
                             x: 6250,
@@ -2493,7 +2483,7 @@ entities.push(createTrigger({
         }
     },
 }));
-entities.push(createTrigger({
+archetypes.add(createTrigger({
     x: 6260,
     y: 100,
     w: 500,
@@ -2504,7 +2494,7 @@ entities.push(createTrigger({
         transform.position.y = -144;
     },
 }));
-entities.push(createTrigger({
+archetypes.add(createTrigger({
     x: 7000,
     y: -1000,
     w: 100,
@@ -2532,38 +2522,48 @@ entities.push(createTrigger({
                 backgroundColor: colorMessageFill,
                 borderColor: colorSkillFill,
             });
-            entities.push(skillUpFill);
-            entities.push(skillUpEmpty);
-            entities.push(message);
+            archetypes.add(skillUpFill);
+            archetypes.add(skillUpEmpty);
+            archetypes.add(message);
         }
     },
 }));
-entities.push(createTrigger({
+archetypes.add(createTrigger({
     x: 9000,
     y: -450,
     w: 400,
     h: 450,
     action: (self, activator, entities) => {
-        const solid = activator.get(Solid.name);
-        const player = activator.get(Player.name);
-        solid.gravity.linear.y = -2;
-        player.isGravityReversed = true;
+        const triggerable = self.get(Triggerable.name);
+        if (triggerable.counter === 0) {
+            const transform = activator.get(Transform.name);
+            const solid = activator.get(Solid.name);
+            const player = activator.get(Player.name);
+            transform.scale.y = -48;
+            solid.gravity.linear.y = -2;
+            player.isGravityReversed = true;
+        }
     },
 }));
-entities.push(createTrigger({
+archetypes.add(createTrigger({
     x: 11500,
     y: -1000,
     w: 500,
     h: 350,
     timeout: 1000,
     action: (self, activator, entities) => {
-        const solid = activator.get(Solid.name);
-        const player = activator.get(Player.name);
-        solid.gravity.linear.y = 2;
-        player.isGravityReversed = false;
+        const triggerable = self.get(Triggerable.name);
+        if (triggerable.counter === 0) {
+            const transform = activator.get(Transform.name);
+            const solid = activator.get(Solid.name);
+            const player = activator.get(Player.name);
+            transform.scale.y *= -1;
+            solid.gravity.linear.y = 2;
+            player.isGravityReversed = false;
+        }
     },
 }));
-entities.push(createTrigger({
+archetypes.add(createTrigger({
     x: 13000,
     y: -400,
     w: 500,
@@ -2592,13 +2592,13 @@ entities.push(createTrigger({
                 backgroundColor: colorMessageFill,
                 borderColor: colorSkillFill,
             });
-            entities.push(skillUpFill);
-            entities.push(skillUpEmpty);
-            entities.push(message);
+            archetypes.add(skillUpFill);
+            archetypes.add(skillUpEmpty);
+            archetypes.add(message);
         }
     },
 }));
-entities.push(createTrigger({
+archetypes.add(createTrigger({
     x: 15100,
     y: -400,
     w: 500,
@@ -2621,8 +2621,8 @@ entities.push(createTrigger({
                 backgroundColor: colorMessageFill,
                 borderColor: colorSkillFill,
             });
-            entities.push(skillUpFill);
-            entities.push(message);
+            archetypes.add(skillUpFill);
+            archetypes.add(message);
         }
     },
 }));
@@ -2631,8 +2631,8 @@ systems.push(new Physics());
 systems.push(new Scrolling());
 systems.push(new Trigger());
 const app = new App({
-    entities: entities,
     systems: systems,
+    archetypes: archetypes,
     width: 1280,
     height: 720,
 });

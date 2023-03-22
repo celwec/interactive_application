@@ -1,6 +1,6 @@
 class Scrolling implements System {
-	update(entities: EntityArray): void {
-		const filtered: EntityArray = entities.all([Transform, Scrollable]);
+	update(archetypes: ArchetypeMap): void {
+		const filtered: Entity[] = archetypes.pull([Transform.name, Scrollable.name]);
 
 		for (let i = 0; i < filtered.length; i++) {
 			const entity: Entity = filtered[i];

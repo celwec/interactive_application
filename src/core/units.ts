@@ -181,21 +181,18 @@ class Frame {
 		this.xOffset = xOffset;
 		this.yOffset = yOffset;
 
-		const off: OffscreenCanvas = new OffscreenCanvas(width, height);
-		const ctx: OffscreenCanvasRenderingContext2D = <OffscreenCanvasRenderingContext2D>off.getContext("2d");
-
 		const image: HTMLImageElement = new Image();
 		image.src = url;
 		const sx: number = xOffset;
 		const sy: number = yOffset;
 		const sw: number = width;
 		const sh: number = height;
-		const dx: number = 0;
-		const dy: number = 0;
-		const dw: number = width;
-		const dh: number = height;
 
-		ctx.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
-		this.texture = off.transferToImageBitmap();
+		image.onload = () =>
+			createImageBitmap(image, sx, sy, sw, sh, {
+				resizeQuality: "pixelated",
+			}).then((sprite) => {
+				this.texture = sprite;
+			});
 	}
 }

@@ -41,7 +41,7 @@ function createBuilding(entities: EntityArray, x: number, y: number, w: number, 
 			entity.set(Transform.name, transform);
 			entity.set(Renderable.name, renderable);
 
-			entities.push(entity);
+			archetypes.add(entity);
 		}
 	}
 

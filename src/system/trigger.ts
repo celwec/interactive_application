@@ -1,10 +1,10 @@
 class Trigger implements System {
-	update(entities: EntityArray): void {
-		const playerEntity: Entity = entities.all([Player])![0];
+	update(archetypes: ArchetypeMap): void {
+		const playerEntity: Entity = archetypes.pull([Player.name])![0];
 		const player: Player = playerEntity.get(Player.name);
 		const playerTransform: Transform = playerEntity.get(Transform.name);
 		const playerSolid: Solid = playerEntity.get(Solid.name);
-		const filtered: Entity[] = entities.all([Triggerable])!;
+		const filtered: Entity[] = archetypes.pull([Triggerable.name])!;
 
 		for (let i = 0; i < filtered.length; i++) {
 			const entity: Entity = filtered[i];

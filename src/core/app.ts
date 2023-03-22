@@ -1,6 +1,6 @@
 class App {
-	private _entities: EntityArray;
 	private _systems: SystemArray;
+	private _archetypes: ArchetypeMap;
 
 	private _keyStates: Object;
 
@@ -26,15 +26,11 @@ class App {
 	private _canvasRatioWidth: number;
 	private _canvasRatioHeight: number;
 
-	constructor(settings: {
-		entities: EntityArray;
-		systems: SystemArray;
-		archetypes?: ArchetypeMap;
-		width?: number;
-		height?: number;
-	}) {
-		this._entities = settings.entities;
+	private _playerTransform: Transform;
+
+	constructor(settings: { systems: SystemArray; archetypes: ArchetypeMap; width?: number; height?: number }) {
 		this._systems = settings.systems;
+		this._archetypes = settings.archetypes;
 
 		this._keyStates = Object;
 
@@ -51,6 +47,9 @@ class App {
 
 		this._canvasRatioWidth = this._canvasWidth / 1280;
 		this._canvasRatioHeight = this._canvasHeight / 720;
+
+		const player: Entity = this._archetypes.pull([Player.name])[0];
+		this._playerTransform = player.get(Transform.name);
 
 		this._loop = this._loop.bind(this);
 		this._processInput = this._processInput.bind(this);
@@ -148,7 +147,7 @@ class App {
 	}
 
 	private _processInput(): void {
-		const filtered: EntityArray = entities.all([Player, Transform, Solid]);
+		const filtered: Entity[] = this._archetypes.pull([Player.name, Transform.name, Solid.name]);
 
 		if (filtered.length !== 1) {
 			return;
@@ -208,7 +207,7 @@ class App {
 	private _update(): void {
 		for (let i = 0; i < this._systems.length; i++) {
 			const system: System = this._systems[i];
-			system.update(this._entities);
+			system.update(this._archetypes);
 		}
 	}
 
@@ -217,19 +216,14 @@ class App {
 			return;
 		}
 
-		const player: Entity = this._entities.all([Player])[0];
-		const playerTransform: Transform = player.get(Transform.name);
+		const filtered: Entity[] = this._archetypes
+			.pull([Transform.name, Renderable.name])
+			.sort((a: Entity, b: Entity) => {
+				const ac: Renderable = a.get(Renderable.name);
+				const bc: Renderable = b.get(Renderable.name);
 
-		if (!playerTransform) {
-			return;
-		}
-
-		const filtered: EntityArray = this._entities.all([Transform, Renderable]).sort((a: Entity, b: Entity) => {
-			const ac: Renderable = a.get(Renderable.name);
-			const bc: Renderable = b.get(Renderable.name);
-
-			return ac.layer - bc.layer;
-		});
+				return ac.layer - bc.layer;
+			});
 
 		if (filtered.length < 1) {
 			return;
@@ -237,8 +231,10 @@ class App {
 
 		this._gl.clear(this._gl.COLOR_BUFFER_BIT);
 		this._gl.useProgram(this._program);
+
 		this._gl.enableVertexAttribArray(this._positionAttributeLocation);
 		this._gl.enableVertexAttribArray(this._texcoordAttributeLocation);
+
 		this._gl.bindBuffer(this._gl.ARRAY_BUFFER, this._positionBuffer);
 
 		const size: number = 2;
@@ -261,8 +257,8 @@ class App {
 			const transform: Transform = entity.get(Transform.name);
 
 			const shape: Polygon = renderable.shape;
-			const dx: number = transform.position.x - playerTransform.position.x;
-			const dy: number = transform.position.y - playerTransform.position.y;
+			const dx: number = transform.position.x - this._playerTransform.position.x;
+			const dy: number = transform.position.y - this._playerTransform.position.y;
 
 			let matrix: Float32Array = transform.matrix;
 
